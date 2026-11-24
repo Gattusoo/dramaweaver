@@ -1,0 +1,23 @@
+# 统一 LF 行尾（2026-11-20 全仓转换后锁定）
+* text=auto eol=lf
+
+# Windows 批处理必须保留 CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 二进制文件不做任何转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.mp4 binary
+*.mp3 binary
+*.wav binary
+*.zip binary
+*.db binary
+*.sqlite3 binary

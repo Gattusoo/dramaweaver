@@ -1,0 +1,26 @@
+[project]
+name = "shortplaygenerating"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "django>=5.2.18",
+    "djangorestframework>=3.18.3",
+    "djangorestframework-simplejwt>=5.5.0",
+    "pyjwt>=2.8.0",
+    "redis>=5.0.0",
+    "httpx>=0.27.0",
+    "celery>=5.4.0",
+    "pillow>=10.0.0",
+    "ffmpeg-python>=0.2.0",
+    "edge-tts==7.3.1",
+    "psycopg2-binary>=2.9.9",  # PostgreSQL驱动（切换到PostgreSQL时需要）
+    "cryptography>=50.0.2",
+    "channels>=4",
+    "daphne>=4",
+    "fpdf2>=2.9.0",
+]
+
+[dependency-groups]
+dev = [
+    "fakeredis==2.40.0",
+]

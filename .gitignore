@@ -1,0 +1,31 @@
+# 本地运行配置（含密钥，不入库）
+conf/env.py
+
+# 密钥
+.secret_key
+
+# IDE / 虚拟环境 / 缓存
+.idea/
+.venv/
+.pytest_cache/
+.agents/
+
+# Python
+__pycache__/
+*.pyc
+
+# 备份
+backup/
+
+# 测试 / 临时数据库
+default_*.sqlite3
+db.sqlite3
+
+# 日志
+*.log
+
+# 运行时用户数据
+media/
+
+# 规格与变更记录（本地保留，不入库）
+openspec/
