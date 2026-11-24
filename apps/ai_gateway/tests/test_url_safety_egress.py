@@ -16,7 +16,7 @@ import httpx
 from django.test import SimpleTestCase, override_settings
 
 from apps.ai_gateway.http import _MAX_REDIRECTS, safe_post, safe_request, safe_stream
-from dvadmin.utils.url_safety import UnsafeURLError
+from apps.core.utils.url_safety import UnsafeURLError
 
 
 class _Provider:

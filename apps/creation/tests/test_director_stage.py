@@ -38,7 +38,7 @@ class DirectorFixture(AssistantFixtureMixin):
             path=[[5, 2], [7, 4], [9, 6]], move_instruction="缓慢推近至特写")
         # 他剧导演台（跨剧拒绝用）
         from ..models import Play, PlayStatus
-        from dvadmin.system.models import CustomUser
+        from apps.core.system.models import CustomUser
         other_owner = CustomUser.objects.create_user(username="dso", password="Passw0rd!123")
         other_play = Play.objects.create(title="他剧", created_by=other_owner,
                                          status=PlayStatus.PAUSED_AT_SCRIPT)
@@ -165,7 +165,7 @@ class ShotDirectingTests(DirectorFixture, TestCase):
         self.assertEqual(resp.status_code, 403)
 
     def test_non_member_404(self):
-        from dvadmin.system.models import CustomUser
+        from apps.core.system.models import CustomUser
         stranger = CustomUser.objects.create_user(username="ds_stranger",
                                                   password="Passw0rd!123")
         client = self.client_for(stranger)

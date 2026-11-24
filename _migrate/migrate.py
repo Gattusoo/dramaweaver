@@ -66,14 +66,14 @@ w("apps/creation/assistant/runner.py",
                  "from apps.ai_gateway.gateway import AIGateway"))
 # tools.py: from .. import media → dvadmin.utils; from ..distribution.analytics → apps.distribution
 tools = open(os.path.join(SRC, "assistant", "tools.py"), encoding="utf-8").read()
-tools = tools.replace("from .. import media", "from dvadmin.utils import media")
+tools = tools.replace("from .. import media", "from apps.core.utils import media")
 tools = tools.replace("from ..distribution.analytics import play_cost_breakdown",
                       "from apps.distribution.analytics import play_cost_breakdown")
 w("apps/creation/assistant/tools.py", tools)
 # views.py: UserRole 拆出；from ..ai_gateway.rate_limiter → apps.ai_gateway
 av = open(os.path.join(SRC, "assistant", "views.py"), encoding="utf-8").read()
 av = av.replace("from ..models import Play, TaskRecord, TaskStatus, TaskType, UserRole",
-                "from ..models import Play, TaskRecord, TaskStatus, TaskType\nfrom dvadmin.system.models import UserRole")
+                "from ..models import Play, TaskRecord, TaskStatus, TaskType\nfrom apps.core.system.models import UserRole")
 av = av.replace("from ..ai_gateway.rate_limiter import RateLimiter",
                 "from apps.ai_gateway.rate_limiter import RateLimiter")
 w("apps/creation/assistant/views.py", av)
@@ -108,7 +108,7 @@ w("apps/distribution/publication.py", pub)
 # rendition.py: from .. import media → dvadmin.utils; Publication 本应用; TaskType 来自 creation
 ren = open(os.path.join(SRC, "distribution", "rendition.py"), encoding="utf-8").read()
 ren = ren.replace("from .. import media as media_utils",
-                  "from dvadmin.utils import media as media_utils")
+                  "from apps.core.utils import media as media_utils")
 ren = ren.replace("from ..models import Publication, TaskType",
                   "from .models import Publication\nfrom apps.creation.models import TaskType")
 ren = ren.replace("from ..pipeline.dispatcher import dispatch_task",
@@ -125,7 +125,7 @@ w("apps/distribution/subtitles.py", sub)
 # ── 6. tasks.py → apps/creation/tasks.py ──
 tasks = open(os.path.join(SRC, "tasks.py"), encoding="utf-8").read()
 tasks = tasks.replace("from . import media as media_utils",
-                      "from dvadmin.utils import media as media_utils")
+                      "from apps.core.utils import media as media_utils")
 # 拆分 models import：分布类移到 apps.distribution.models
 tasks = tasks.replace(
     "from .models import (\n    Asset, AssetDependency, AssetLibrary, AssetStatus, AssetType, Character, Episode,\n    EpisodeStatus, PlayStatus, Publication, RelationType, Scene, Shot, SubtitleSourceType,\n    SubtitleStatus, SubtitleTrack, TaskRecord, TaskStatus,\n)",
@@ -134,9 +134,9 @@ tasks = tasks.replace(
 tasks = tasks.replace("from .ai_gateway.gateway import AIGateway",
                       "from apps.ai_gateway.gateway import AIGateway")
 tasks = tasks.replace("from .storage import save_artifact",
-                      "from dvadmin.utils.storage import save_artifact")
+                      "from apps.core.utils.storage import save_artifact")
 tasks = tasks.replace("from .url_safety import check_url",
-                      "from dvadmin.utils.url_safety import check_url")
+                      "from apps.core.utils.url_safety import check_url")
 tasks = tasks.replace("from .distribution import rendition as rd",
                       "from apps.distribution import rendition as rd")
 tasks = tasks.replace("from .distribution.subtitles import generate_subtitle_track",

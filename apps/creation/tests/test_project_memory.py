@@ -18,7 +18,7 @@ from apps.creation.assistant.project_memory import (
 )
 from apps.creation.assistant import project_memory as PM
 from apps.creation.models import Character, CharacterRole, Episode, Play, PlayStatus
-from dvadmin.system.models import CustomUser
+from apps.core.system.models import CustomUser
 
 
 class ProjectMemoryTests(TestCase):

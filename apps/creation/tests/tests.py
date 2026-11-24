@@ -9,7 +9,7 @@ from rest_framework.test import APITestCase
 from apps.creation.models import (
     Episode, MemberRole, MemberStatus, Play, PlayMember,
 )
-from dvadmin.system.models import CustomUser
+from apps.core.system.models import CustomUser
 
 
 def make_user(username, password="Passw0rd!123", **kw):

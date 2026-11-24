@@ -11,14 +11,14 @@ from django.conf import settings
 from django.test import SimpleTestCase, TestCase
 from rest_framework.test import APITestCase
 
-from dvadmin.utils import media
+from apps.core.utils import media
 from apps.creation import tasks
 from apps.creation.models import (
     Asset, AssetDependency, AssetLibrary, AssetStatus, AssetType, Episode, EpisodeStatus,
     MemberRole, MemberStatus, Play, PlayMember, Scene, Shot, TaskRecord, TaskStatus,
     TaskType,
 )
-from dvadmin.system.models import (
+from apps.core.system.models import (
     CustomUser, UserRole,
 )
 from apps.distribution.models import (
@@ -462,7 +462,7 @@ class DerivativesRealTests(DerivativeFixtureMixin, TestCase):
 
         for p in (patch("apps.creation.tasks._download",
                         side_effect=lambda url, path, play_pk=None: shutil.copyfile(self.fx / "master.mp4", path) or path),
-                  patch("dvadmin.utils.storage.save_artifact", side_effect=fake_save)):
+                  patch("apps.core.utils.storage.save_artifact", side_effect=fake_save)):
             p.start()
             self.addCleanup(p.stop)
         self.play.agent_config = None
@@ -597,7 +597,7 @@ class IngestValidationTests(TestCase):
     def setUp(self):
         super().setUp()
         for p in (patch("apps.creation.pipeline.dispatcher.send_task", return_value=MagicMock(id="x")),
-                  patch("dvadmin.utils.storage.save_artifact", side_effect=lambda d, f, s="": f"/media/{s}/{f}")):
+                  patch("apps.core.utils.storage.save_artifact", side_effect=lambda d, f, s="": f"/media/{s}/{f}")):
             p.start()
             self.addCleanup(p.stop)
         owner = CustomUser.objects.create_user(username="in", password="Passw0rd!123")

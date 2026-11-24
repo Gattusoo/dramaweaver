@@ -14,7 +14,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from ..models import Play, TaskRecord, TaskStatus, TaskType
-from dvadmin.system.permissions import is_platform_admin
+from apps.core.system.permissions import is_platform_admin
 from ..permissions import can_write_play, get_accessible_play_ids
 from . import events
 from .models import AssistantMessage, AssistantSession, MessageRole, ProposalStatus

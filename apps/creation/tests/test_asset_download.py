@@ -11,7 +11,7 @@ from apps.creation.models import (
     MemberRole, MemberStatus, Play, PlayMember, Scene, Shot,
 )
 from apps.creation.workspace.storage import project_dir, save_asset_bytes
-from dvadmin.system.models import CustomUser, UserRole
+from apps.core.system.models import CustomUser, UserRole
 
 
 def _mk_member(play, user, role):

@@ -20,7 +20,7 @@ from apps.ai_gateway.models import AIModel, AIProvider
 from apps.ai_gateway.redis_client import MemoryStore, reset_store
 from apps.ai_gateway.security import classify_test_error, validate_base_url
 from apps.creation.models import AgentConfig
-from dvadmin.system.models import CustomUser, UserRole
+from apps.core.system.models import CustomUser, UserRole
 
 
 # ─── A.1 SSRF 防护 ────────────────────────────────────────────────────────

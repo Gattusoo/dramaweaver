@@ -323,8 +323,8 @@ class WebFetchTests(TestCase):
         _FakeClient.responses = {"https://api.example.com/v1":
                                  _fake_response("https://api.example.com/v1")}
         with mock.patch("httpx.Client", _FakeClient), \
-             mock.patch("dvadmin.utils.url_safety.check_url"), \
-             mock.patch("dvadmin.utils.url_safety.check_peer"):
+             mock.patch("apps.core.utils.url_safety.check_url"), \
+             mock.patch("apps.core.utils.url_safety.check_peer"):
             result = self._call("https://api.example.com/v1")
         self.assertEqual(result["status"], 200)
         self.assertEqual(result["text"], "hello")
@@ -345,8 +345,8 @@ class WebFetchTests(TestCase):
                                                 status=302,
                                                 redirect="https://evil.example.net/x")}
         with mock.patch("httpx.Client", _FakeClient), \
-             mock.patch("dvadmin.utils.url_safety.check_url"), \
-             mock.patch("dvadmin.utils.url_safety.check_peer"):
+             mock.patch("apps.core.utils.url_safety.check_url"), \
+             mock.patch("apps.core.utils.url_safety.check_peer"):
             result = self._call("https://api.example.com/redirect")
         self.assertEqual(result[0], "ERROR")
         self.assertIn("白名单", result[1])
@@ -355,8 +355,8 @@ class WebFetchTests(TestCase):
         _FakeClient.responses = {"https://api.example.com/e":
                                  _fake_response("https://api.example.com/e", status=503)}
         with mock.patch("httpx.Client", _FakeClient), \
-             mock.patch("dvadmin.utils.url_safety.check_url"), \
-             mock.patch("dvadmin.utils.url_safety.check_peer"):
+             mock.patch("apps.core.utils.url_safety.check_url"), \
+             mock.patch("apps.core.utils.url_safety.check_peer"):
             result = self._call("https://api.example.com/e")
         self.assertEqual(result[0], "ERROR")
 
@@ -365,8 +365,8 @@ class WebFetchTests(TestCase):
                                  _fake_response("https://api.example.com/big",
                                                 text="x" * 1000)}
         with mock.patch("httpx.Client", _FakeClient), \
-             mock.patch("dvadmin.utils.url_safety.check_url"), \
-             mock.patch("dvadmin.utils.url_safety.check_peer"), \
+             mock.patch("apps.core.utils.url_safety.check_url"), \
+             mock.patch("apps.core.utils.url_safety.check_peer"), \
              override_settings(WEB_FETCH_MAX_BYTES=300):
             result = self._call("https://api.example.com/big")
         self.assertTrue(result["truncated"])
@@ -399,8 +399,8 @@ class WebFetchRunnerE2ETests(TestCase):
                                  _fake_response("https://api.example.com/v1",
                                                 text="结果文本")}
         with mock.patch("httpx.Client", _FakeClient), \
-             mock.patch("dvadmin.utils.url_safety.check_url"), \
-             mock.patch("dvadmin.utils.url_safety.check_peer"):
+             mock.patch("apps.core.utils.url_safety.check_url"), \
+             mock.patch("apps.core.utils.url_safety.check_peer"):
             result, err = T.run_tool(ctx, "web_fetch",
                                      {"url": "https://api.example.com/v1"})
         self.assertFalse(err)

@@ -87,7 +87,7 @@ class UserProviderCredential(models.Model):
 
     - 属主私有：他人（含剧内成员）不可见；属主也不能读成员的凭证
     - 接口只写：POST/PUT 接收明文，GET 仅回 key_last4 + label（决策 6）
-    - 加密：dvadmin.utils.encryption（Fernet，SECRET_KEY 派生密钥）
+    - 加密：apps.core.utils.encryption（Fernet，SECRET_KEY 派生密钥）
     - UNIQUE(user, provider)：同一用户对同一供应商一条凭证（多 Key 后续再扩）
     """
 
@@ -124,11 +124,11 @@ class UserProviderCredential(models.Model):
 
     # ── 加密读写（避免明文落审计/日志） ──────────────────────────────────────
     def set_key(self, plain: str) -> None:
-        from dvadmin.utils.encryption import encrypt_value
+        from apps.core.utils.encryption import encrypt_value
         self.encrypted_key = encrypt_value(plain, purpose=self.ENCRYPTION_PURPOSE)
 
     def get_key(self) -> str:
-        from dvadmin.utils.encryption import decrypt_value
+        from apps.core.utils.encryption import decrypt_value
         return decrypt_value(self.encrypted_key, purpose=self.ENCRYPTION_PURPOSE)
 
     @property

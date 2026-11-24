@@ -8,7 +8,7 @@ import logging
 
 from rest_framework.views import exception_handler as drf_exception_handler
 
-logger = logging.getLogger("dvadmin.exception")
+logger = logging.getLogger("apps.core.exception")
 
 
 class BusinessError(Exception):

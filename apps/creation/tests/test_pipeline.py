@@ -11,7 +11,7 @@ from apps.creation.models import (
 from apps.ai_gateway.models import (
     AIModel, AIProvider,
 )
-from dvadmin.system.models import (
+from apps.core.system.models import (
     CustomUser, UserRole,
 )
 from apps.creation.pipeline.checkpoints import approve, reject, should_pause

@@ -1,4 +1,4 @@
-"""dvadmin/system：用户与认证模型。"""
+"""apps/core/system：用户与认证模型（原 dvadmin 脚手架，已并入项目）。"""
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 

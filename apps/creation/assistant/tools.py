@@ -493,7 +493,7 @@ def _clean_shot_fields(ctx, fields):
             pk=fields["dialogue_character_id"]).exists():
         raise ToolError(f"角色 {fields['dialogue_character_id']} 不属于本剧")
     if "sound_effects" in fields:
-        from dvadmin.utils import media
+        from apps.core.utils import media
         fields["sound_effects"] = media.normalize_sound_effects(fields["sound_effects"])
     return fields
 
@@ -919,7 +919,7 @@ def web_fetch(ctx, url, max_chars=None):
     """
     import httpx
     from urllib.parse import urlsplit
-    from dvadmin.utils.url_safety import UnsafeURLError, check_peer, check_url
+    from apps.core.utils.url_safety import UnsafeURLError, check_peer, check_url
 
     if not _web_fetch_enabled():
         raise ToolError("web_fetch 未启用（需配置 WEB_FETCH_ALLOWED_HOSTS）")

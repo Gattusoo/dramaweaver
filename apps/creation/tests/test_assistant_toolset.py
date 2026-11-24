@@ -14,7 +14,7 @@ from apps.ai_gateway.models import (
 from apps.creation.models import (
     Asset, AssetLibrary, AssetStatus, AssetType, Character, Episode, PlayStatus, ReviewLog, Scene, Shot, TaskRecord, TaskType, VoiceProfile,
 )
-from dvadmin.system.models import (
+from apps.core.system.models import (
     CustomUser, UserRole,
 )
 from .test_assistant import AssistantFixtureMixin, FakeChatGateway, _say, _use

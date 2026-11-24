@@ -1,13 +1,13 @@
 """字段级对称加密工具（Fernet，密钥由 settings.SECRET_KEY 派生）。
 
 用于敏感配置（如 UserProviderCredential.encrypted_key）的落库加密：
-- 密钥派生：HKDF-SHA256(secret_key, salt="dvadmin-field-encryption", info=model 标签)
+- 密钥派生：HKDF-SHA256(secret_key, salt=_SALT, info=model 标签)
   → 32 字节 → urlsafe_base64 → Fernet key
 - 同一 SECRET_KEY 不同用途派生不同密钥（HKDF info 字段隔离）
 - SECRET_KEY 泄漏已意味着全盘失控，作加密密钥安全等价（无需独立密钥管理）
 
 用法：
-    from dvadmin.utils.encryption import encrypt_value, decrypt_value
+    from apps.core.utils.encryption import encrypt_value, decrypt_value
 
     cipher = encrypt_value("sk-xxx", purpose="user_provider_credential")
     plain = decrypt_value(cipher, purpose="user_provider_credential")
@@ -26,6 +26,7 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
 _VERSION_PREFIX = "v1:"
+# 注意：此盐值承自原 dvadmin 代码，已被既有密文依赖——勿改，否则历史数据不可解。
 _SALT = b"dvadmin-field-encryption"
 _KEY_CACHE: dict[str, bytes] = {}
 

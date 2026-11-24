@@ -10,8 +10,8 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from dvadmin.system.permissions import IsAdminOnly
-from dvadmin.utils.pagination import CustomPagination
+from apps.core.system.permissions import IsAdminOnly
+from apps.core.utils.pagination import CustomPagination
 
 from apps.creation.models import TaskRecord
 from apps.creation.views.base import PlayScopedViewSet

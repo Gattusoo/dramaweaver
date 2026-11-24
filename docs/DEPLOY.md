@@ -1,6 +1,6 @@
 # 部署与配置说明
 
-> 项目骨架自 `restructure-dvadmin-skeleton` 起改为 `application/` 包，配置从环境变量 / `conf/env.py` 读取。
+> 项目骨架自 `restructure-dvadmin-skeleton` 变更（原 dvadmin 脚手架，现位于 apps/core/）起改为 `application/` 包，配置从环境变量 / `conf/env.py` 读取。
 
 ## 1. 启动入口
 

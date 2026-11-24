@@ -26,7 +26,7 @@
 
 ## 0.1 响应格式与错误码（BREAKING）
 
-自 `restructure-dvadmin-skeleton` 起，所有 JSON 接口统一为下述结构。前端需按此一次性适配。
+自 `restructure-dvadmin-skeleton` 变更（原 dvadmin 脚手架重组）起，所有 JSON 接口统一为下述结构。前端需按此一次性适配。
 
 ### 成功响应
 

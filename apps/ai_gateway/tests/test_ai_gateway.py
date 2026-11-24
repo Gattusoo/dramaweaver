@@ -18,7 +18,7 @@ from apps.ai_gateway.models import (
 from apps.creation.models import (
     AgentConfig, Play, TaskRecord,
 )
-from dvadmin.system.models import (
+from apps.core.system.models import (
     CustomUser, UserRole,
 )
 

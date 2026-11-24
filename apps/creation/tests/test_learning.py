@@ -154,7 +154,7 @@ class OptimizeStrategyTests(AssistantFixtureMixin, TestCase):
 
 class ExperimentTests(TestCase):
     def setUp(self):
-        from dvadmin.system.models import CustomUser
+        from apps.core.system.models import CustomUser
         self.user = CustomUser.objects.create_user(username="exp", password="Passw0rd!123")
         self.exp = StrategyExperiment.objects.create(
             name="策略A/B", created_by=self.user,
@@ -378,7 +378,7 @@ class SeedCommandTests(TestCase):
 
     def test_seed_play_scope(self):
         from apps.creation.models import Play
-        from dvadmin.system.models import CustomUser
+        from apps.core.system.models import CustomUser
         user = CustomUser.objects.create_user(username="s", password="Passw0rd!123")
         play = Play.objects.create(title="t", created_by=user)
         call_command("seed_skill_library", "--play", str(play.pk), verbosity=0)

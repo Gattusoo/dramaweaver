@@ -11,7 +11,7 @@ from ..models import (
 )
 from ..models import MemberStatus, PlayMember
 from ..permissions import get_accessible_play_ids
-from dvadmin.system.permissions import is_platform_admin
+from apps.core.system.permissions import is_platform_admin
 
 UserModel = get_user_model()
 

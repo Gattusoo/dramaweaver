@@ -14,7 +14,7 @@ from apps.creation.pipeline.local_backend import PAID_CHECKPOINT, send_task
 from apps.creation.pipeline.recovery import (
     RecoveryError, confirm_recovery, issue_recovery_token,
 )
-from dvadmin.system.models import CustomUser, UserRole
+from apps.core.system.models import CustomUser, UserRole
 
 
 def _mk_member(play, user, role):

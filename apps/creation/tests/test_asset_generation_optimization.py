@@ -16,7 +16,7 @@ from apps.creation.models import (
     AgentConfig, Asset, AssetStatus, AssetType, AuditMode, Episode, MemberRole,
     MemberStatus, Play, PlayMember, Scene, Shot, TaskRecord, TaskStatus, TaskType,
 )
-from dvadmin.system.models import CustomUser, UserRole
+from apps.core.system.models import CustomUser, UserRole
 
 
 def _mk_member(play, user, role):

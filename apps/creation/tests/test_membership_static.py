@@ -1,7 +1,7 @@
 """静态一致性防护（任务 6.1）：全局四级角色与 authorized_users 不得残留消费方。
 
 漏改点的症状是"权限比预期松"——用扫描兜底，防止后续改动重新引入全局角色分支。
-对齐 dvadmin/system/tests/test_config.py 的既有风格。
+对齐 apps/core/system/tests/test_config.py 的既有风格。
 """
 import re
 from pathlib import Path
@@ -9,13 +9,13 @@ from pathlib import Path
 from django.test import SimpleTestCase
 
 REPO = Path(__file__).resolve().parents[3]
-SCAN_DIRS = ("apps", "dvadmin")
+SCAN_DIRS = ("apps",)
 
 # 允许保留的引用（迁移历史、模型定义、测试、注释性文档）
 ALLOW = {
     # 模型字段定义（停读但保留列）
-    "dvadmin/system/models.py",
-    "dvadmin/system/migrations",
+    "apps/core/system/models.py",
+    "apps/core/system/migrations",
     "apps/creation/migrations",
     "apps/public_api/serializers.py",  # 注释说明
     "apps/ai_gateway/adapters.py",     # OpenAI 消息 role= 参数，非 UserRole

@@ -86,7 +86,7 @@ class DegradationLoggingTests(TestCase):
         from apps.creation.assistant.models import AssistantSession
         from apps.creation.assistant.planning import reflect_on_failure
         from apps.creation.models import AgentConfig, Play, PlayStatus
-        from dvadmin.system.models import CustomUser
+        from apps.core.system.models import CustomUser
         user = CustomUser.objects.create_user(username="p1llm", password="t")
         play = Play.objects.create(title="t", status=PlayStatus.DRAFT, created_by=user)
         config = AgentConfig.objects.create(name="c", created_by=user)
@@ -104,7 +104,7 @@ class DegradationLoggingTests(TestCase):
         from apps.creation.assistant.planning import PlanningEngine
         from apps.creation.assistant.models import AssistantSession
         from apps.creation.models import AgentConfig, Play, PlayStatus
-        from dvadmin.system.models import CustomUser
+        from apps.core.system.models import CustomUser
         user = CustomUser.objects.create_user(username="p1llm2", password="t")
         play = Play.objects.create(title="t", status=PlayStatus.DRAFT, created_by=user)
         config = AgentConfig.objects.create(name="c", created_by=user)

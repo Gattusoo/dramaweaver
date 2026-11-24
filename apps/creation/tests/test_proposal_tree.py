@@ -304,7 +304,7 @@ class ScriptVersionApiTests(AssistantFixtureMixin, APITestCase):
         self.assertEqual(resp.status_code, 403)
 
     def test_foreign_play_404(self):
-        from dvadmin.system.models import CustomUser
+        from apps.core.system.models import CustomUser
         other = CustomUser.objects.create_user(username="x", password="Passw0rd!123")
         self.client.force_authenticate(other)
         self.assertEqual(self.client.get(self.url).status_code, 404)

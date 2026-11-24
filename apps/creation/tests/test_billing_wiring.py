@@ -19,7 +19,7 @@ from apps.creation.models import (
     AgentConfig, AuditMode, Play, TaskRecord, TaskStatus, TaskType,
 )
 from apps.creation.pipeline import dispatcher
-from dvadmin.system.models import CustomUser, UserRole
+from apps.core.system.models import CustomUser, UserRole
 
 from .test_assistant import AssistantFixtureMixin, _say, _use
 

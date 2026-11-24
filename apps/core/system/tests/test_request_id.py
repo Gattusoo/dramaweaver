@@ -7,7 +7,7 @@ import logging
 
 from rest_framework.test import APITestCase
 
-from dvadmin.utils.exception import custom_exception_handler
+from apps.core.utils.exception import custom_exception_handler
 
 
 class RequestIDHeaderTests(APITestCase):
@@ -39,7 +39,7 @@ class RequestIDExceptionTests(APITestCase):
             request_id = "req-abc-123"
 
         context = {"request": _FakeRequest()}
-        with self.assertLogs("dvadmin.exception", level="ERROR") as logs:
+        with self.assertLogs("apps.core.exception", level="ERROR") as logs:
             resp = custom_exception_handler(ValueError("boom"), context)
 
         self.assertEqual(resp.status_code, 500)
@@ -49,7 +49,7 @@ class RequestIDExceptionTests(APITestCase):
 
     def test_exception_without_request_id_omits_it(self):
         context = {"request": object()}
-        with self.assertLogs("dvadmin.exception", level="ERROR"):
+        with self.assertLogs("apps.core.exception", level="ERROR"):
             resp = custom_exception_handler(RuntimeError("x"), context)
         self.assertEqual(resp.status_code, 500)
         self.assertNotIn("request_id", resp.data)

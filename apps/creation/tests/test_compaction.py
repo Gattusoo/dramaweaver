@@ -21,7 +21,7 @@ from apps.creation.assistant.compaction import (
 from apps.creation.assistant.models import AssistantSession
 from apps.creation.assistant.session_tree import SessionStorage, SessionTree, SessionTreeManager
 from apps.creation.models import AgentConfig, Play, PlayStatus
-from dvadmin.system.models import CustomUser
+from apps.core.system.models import CustomUser
 
 
 def _big_text(n):
@@ -318,7 +318,7 @@ class CompactionApiTests(TestCase):
     """POST /sessions/{id}/compact/ 端点。"""
 
     def setUp(self):
-        from dvadmin.system.models import UserRole
+        from apps.core.system.models import UserRole
         self.user = CustomUser.objects.create_user(username="apiu", password="t")
         self.user.role = UserRole.PRODUCER
         self.user.save()

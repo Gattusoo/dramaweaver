@@ -254,7 +254,7 @@ class NovelPermissionTests(NovelFixture, TestCase):
         self.assertEqual(create.status_code, 403)
 
     def test_non_member_404(self):
-        from dvadmin.system.models import CustomUser
+        from apps.core.system.models import CustomUser
         stranger = CustomUser.objects.create_user(username="stranger", password="Passw0rd!123")
         self.assertEqual(self.jget(stranger, "chapter_list").status_code, 200)
         # PlayScopedViewSet 隔离：陌生人可访问集合为空

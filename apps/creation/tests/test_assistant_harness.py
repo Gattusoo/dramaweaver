@@ -18,7 +18,7 @@ from apps.creation.assistant.tools import SchemaValidationError, ToolError
 from apps.creation.models import (
     MemberRole, MemberStatus, PlayMember, TaskRecord, TaskStatus, TaskType,
 )
-from dvadmin.system.models import CustomUser
+from apps.core.system.models import CustomUser
 
 from .test_assistant import AssistantFixtureMixin, FakeChatGateway, _say, _use
 

@@ -21,7 +21,7 @@ from celery import shared_task
 from django.conf import settings
 from django.utils import timezone
 
-from dvadmin.utils import media as media_utils
+from apps.core.utils import media as media_utils
 from .models import (
     Asset, AssetDependency, AssetLibrary, AssetStatus, AssetType, Character, Episode,
     EpisodeStatus, MemberStatus, NovelChapter, PlayStatus, PlayMember, RelationType,
@@ -315,7 +315,7 @@ def _maybe_vision_review(play, asset, shot=None):
 
 def _save_image_result(result, filename):
     """从适配器结果保存图片，返回 artifact_url。保存字节前校验可解码（D12）。"""
-    from dvadmin.utils.storage import save_artifact
+    from apps.core.utils.storage import save_artifact
     if result.get("url"):
         return result["url"]
     if result.get("image_bytes"):
@@ -336,7 +336,7 @@ def _store_generated_bytes(play, data, asset_type):
     """
     from django.conf import settings
     if getattr(settings, "STORAGE_BACKEND", "local") == "s3":
-        from dvadmin.utils.storage import save_artifact
+        from apps.core.utils.storage import save_artifact
         ext = {"IMAGE": "png", "AUDIO": "mp3", "VIDEO": "mp4"}.get(str(asset_type), "bin")
         url = save_artifact(data, f"{play.uuid}_{asset_type}.{ext}", "generated")
         return "", url, ""
@@ -766,7 +766,7 @@ def generate_tts(record_id):
             "TTS", config, play=play, task_record=record, shot=shot,
             text=shot.dialogue, voice_id=voice_id,
         )
-        from dvadmin.utils.storage import save_artifact
+        from apps.core.utils.storage import save_artifact
         audio = result.get("audio_bytes")
         url = result.get("url", "")
         duration = result.get("duration_seconds", 0) or (result.get("usage") or {}).get("audio_seconds", 0)
@@ -1032,7 +1032,7 @@ def _download(url, path, play_pk=None):
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     if url.startswith(("http://", "https://")):
         import httpx
-        from dvadmin.utils.url_safety import check_peer, check_url
+        from apps.core.utils.url_safety import check_peer, check_url
         current = url
         for _ in range(_MAX_REDIRECTS + 1):
             check_url(current)
@@ -1914,7 +1914,7 @@ def _compose(record, preview=False):
         except Exception as exc:  # noqa: BLE001
             logger.warning("成片媒体元数据探测失败: %s", exc)
             media_info = {}
-        from dvadmin.utils.storage import save_artifact
+        from apps.core.utils.storage import save_artifact
         n = episode.episode_number
 
         if preview:
@@ -2078,7 +2078,7 @@ def _export_composition(record):
                               total, _cancel_check,
                               extra=media_utils.keyframe_args(style.get("gop_seconds", 2)))
         duration = _verify_output(out, total)
-        from dvadmin.utils.storage import save_artifact
+        from apps.core.utils.storage import save_artifact
         url = save_artifact(out.read_bytes(),
                             f"play{play.pk}_ep{episode.episode_number}_edit_r{record.pk}.mp4",
                             "videos")
@@ -2186,7 +2186,7 @@ def _render_channel_version(pub):
         run_ffmpeg(args, timeout=1800)
         info = _probe_media(out)
         _verify_rendition(out, plan, info)
-        from dvadmin.utils.storage import save_artifact
+        from apps.core.utils.storage import save_artifact
         url = save_artifact(out.read_bytes(),
                             f"play{pub.episode.play.pk}_ep{pub.episode.episode_number}_"
                             f"{pub.channel.platform or pub.channel.pk}.mp4",
@@ -2416,7 +2416,7 @@ def _build_trailer(tmp, master, timeline, style, has_audio, tag):
                + ["-pix_fmt", "yuv420p", "-movflags", "+faststart", str(out)], timeout=900)
     _decode_check(out)
     info = _probe_media(out)
-    from dvadmin.utils.storage import save_artifact
+    from apps.core.utils.storage import save_artifact
     url = save_artifact(out.read_bytes(), f"{tag}_trailer.mp4", "trailers")
     return {"url": url, "duration_seconds": info["duration"], "media": info,
             "clips": [{"start": c["start"], "duration": c["duration"], "shot_id": c["shot_id"]} for c in clips]}
@@ -2433,7 +2433,7 @@ def _build_gif(tmp, master, timeline, style, trailer, tag):
     out = tmp / "preview.gif"
     run_ffmpeg(["-y", "-ss", f"{start:.3f}", "-t", f"{seconds:.3f}", "-i", str(src),
                 "-filter_complex", media_utils.gif_filter(), "-loop", "0", str(out)], timeout=300)
-    from dvadmin.utils.storage import save_artifact
+    from apps.core.utils.storage import save_artifact
     return {"url": save_artifact(out.read_bytes(), f"{tag}.gif", "previews")}
 
 
@@ -2443,7 +2443,7 @@ def _build_posters(tmp, master, timeline, style, total, tag):
     windows = media_utils.pick_poster_candidates(timeline, k, total)
     if not windows:
         raise ValueError("无可取帧的正片区间")
-    from dvadmin.utils.storage import save_artifact
+    from apps.core.utils.storage import save_artifact
     out = []
     for i, w in enumerate(windows):
         span = max(0.04, w["end"] - w["start"])
@@ -2466,7 +2466,7 @@ def _build_hls(tmp, master, style, tag):
     segments = sorted(hls_dir.glob("seg_*.ts"))
     if not segments or not playlist.exists():
         raise ValueError("HLS 切片未产出分片")
-    from dvadmin.utils.storage import save_artifact
+    from apps.core.utils.storage import save_artifact
     subdir = f"hls/{tag}"
     for seg in segments:
         save_artifact(seg.read_bytes(), seg.name, subdir)

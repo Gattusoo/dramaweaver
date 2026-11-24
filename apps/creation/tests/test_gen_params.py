@@ -26,7 +26,7 @@ from apps.creation.pipeline.gen_params import (
     ASPECT_RATIOS, aspect_ratio_dims, resolve_gen_params,
 )
 from apps.creation.tasks import _canvas, _cover, _effective_style
-from dvadmin.system.models import CustomUser, UserRole
+from apps.core.system.models import CustomUser, UserRole
 
 
 class GenParamsResolveTests(SimpleTestCase):
@@ -284,7 +284,7 @@ class EffectiveStyleTests(SimpleTestCase):
 # ── 双模式 settings（任务 1.1 / 1.2）─────────────────────────────────────────
 
 def _reload_settings():
-    """重新加载 application.settings（与 dvadmin/system/tests/test_config.py 相同手法）。"""
+    """重新加载 application.settings（与 apps/core/system/tests/test_config.py 相同手法）。"""
     import django
     import importlib
     from django.conf import settings as django_settings

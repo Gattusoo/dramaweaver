@@ -6,7 +6,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from dvadmin.system.permissions import is_platform_admin
+from apps.core.system.permissions import is_platform_admin
 
 from ..models import AgentConfig
 from ..serializers import AgentConfigSerializer

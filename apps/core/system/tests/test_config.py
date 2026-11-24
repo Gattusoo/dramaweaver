@@ -66,7 +66,7 @@ class ConfigLoadingTests(unittest.TestCase):
         import tempfile
         from pathlib import Path
 
-        repo = Path(__file__).resolve().parents[3]
+        repo = Path(__file__).resolve().parents[4]
         with tempfile.TemporaryDirectory() as tmp:
             pkg = Path(tmp) / "conf"
             pkg.mkdir()
@@ -95,10 +95,10 @@ class FeatureFlagWiringTests(unittest.TestCase):
 
         from django.conf import settings
 
-        repo = Path(__file__).resolve().parents[3]
+        repo = Path(__file__).resolve().parents[4]
         read_re = re.compile(r'getattr\(\s*settings\s*,\s*["\'](ENABLE_[A-Z_]+)["\']')
         used = set()
-        for path in list((repo / "apps").rglob("*.py")) + list((repo / "dvadmin").rglob("*.py")):
+        for path in list((repo / "apps").rglob("*.py")):
             if "tests" in path.parts or "__pycache__" in path.parts:
                 continue
             text = path.read_text(encoding="utf-8", errors="ignore")
@@ -115,7 +115,7 @@ class FeatureFlagWiringTests(unittest.TestCase):
 
         from django.conf import settings
 
-        repo = Path(__file__).resolve().parents[3]
+        repo = Path(__file__).resolve().parents[4]
         removed = [
             "ENABLE_WORKING_MEMORY", "ENABLE_EPISODIC_MEMORY", "ENABLE_SEMANTIC_MEMORY",
             "ENABLE_PLAN_AND_SOLVE", "ENABLE_AB_TESTING", "ENABLE_CONTEXT_MANAGEMENT",
@@ -128,7 +128,7 @@ class FeatureFlagWiringTests(unittest.TestCase):
         ]
         read_re = re.compile(r'getattr\(\s*settings\s*,\s*["\'](ENABLE_[A-Z_]+)["\']')
         offenders = []
-        for path in list((repo / "apps").rglob("*.py")) + list((repo / "dvadmin").rglob("*.py")):
+        for path in list((repo / "apps").rglob("*.py")):
             if "tests" in path.parts or "__pycache__" in path.parts:
                 continue
             text = path.read_text(encoding="utf-8", errors="ignore")

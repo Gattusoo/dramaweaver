@@ -30,7 +30,7 @@ from apps.creation.models import (
     AgentConfig, MemberRole, MemberStatus, Play, PlayMember, PlayStatus,
     TaskRecord, TaskStatus, TaskType,
 )
-from dvadmin.system.models import CustomUser
+from apps.core.system.models import CustomUser
 
 
 def _mk(user=None, uname="ev"):

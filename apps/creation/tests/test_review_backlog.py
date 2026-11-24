@@ -10,13 +10,13 @@ from apps.creation.assistant.tools import ToolContext, run_tool, validate, ToolE
 from apps.creation.models import (
     AgentConfig, Asset, AssetDependency, AssetStatus, AssetType, AuditMode, Episode, EpisodeStatus, Play, PlayStatus, Scene, Shot, TaskRecord, TaskStatus, TaskType,
 )
-from dvadmin.system.models import (
+from apps.core.system.models import (
     CustomUser, UserRole,
 )
 from apps.creation.pipeline import dispatcher
 from apps.creation.pipeline.checkpoints import CheckpointConflict, approve, reject
 from apps.creation.pipeline.state_machine import summary_play_status
-from dvadmin.utils.url_safety import UnsafeURLError, check_peer, check_url
+from apps.core.utils.url_safety import UnsafeURLError, check_peer, check_url
 from apps.distribution.models import SubtitleSourceType, SubtitleStatus, SubtitleTrack
 
 
@@ -293,7 +293,7 @@ class DownloadSafetyTests(TestCase):
         ctx.__enter__ = MagicMock(return_value=resp)
         ctx.__exit__ = MagicMock(return_value=False)
         with tempfile.TemporaryDirectory() as tmp:
-            with patch("dvadmin.utils.url_safety.check_url", return_value="evil.com"), \
+            with patch("apps.core.utils.url_safety.check_url", return_value="evil.com"), \
                  patch("httpx.stream", return_value=ctx):
                 with self.assertRaises(UnsafeURLError):
                     tasks._download("http://evil.com/a.mp3", Path(tmp) / "a.mp3")
@@ -313,7 +313,7 @@ class DownloadSafetyTests(TestCase):
         ctx.__exit__ = MagicMock(return_value=False)
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "a.mp3"
-            with patch("dvadmin.utils.url_safety.check_url", return_value="example.com"), \
+            with patch("apps.core.utils.url_safety.check_url", return_value="example.com"), \
                  patch("httpx.stream", return_value=ctx):
                 tasks._download("http://example.com/a.mp3", out)
             self.assertEqual(out.read_bytes(), b"DATA")

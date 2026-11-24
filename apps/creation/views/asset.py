@@ -5,7 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
-from dvadmin.system.permissions import is_platform_admin
+from apps.core.system.permissions import is_platform_admin
 
 from ..models import (
     Asset, AssetDependency, AssetLibrary, AssetStatus, AssetType, Shot,

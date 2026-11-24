@@ -9,7 +9,7 @@ from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from dvadmin.system.models import CustomUser
+from apps.core.system.models import CustomUser
 from apps.creation.models import AgentConfig, MemberRole, MemberStatus, Play, PlayMember
 
 
@@ -111,7 +111,7 @@ class ResponseFormatTests(APITestCase):
 
     def test_error_extra_fields_passed_through(self):
         """错误体附加业务字段透传到信封顶层（提案 status / 记忆 content+revision 等）。"""
-        from dvadmin.utils.renderers import CustomJSONRenderer
+        from apps.core.utils.renderers import CustomJSONRenderer
         from rest_framework.test import APIRequestFactory
         from rest_framework.response import Response as DRFResponse
 

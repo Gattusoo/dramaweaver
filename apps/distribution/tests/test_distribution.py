@@ -20,7 +20,7 @@ from apps.ai_gateway.models import (
 from apps.creation.models import (
     AgentConfig, Asset, AssetStatus, AssetType, AuditMode, Episode, Play, PlayStatus, Scene, Shot, TaskRecord, TaskType,
 )
-from dvadmin.system.models import (
+from apps.core.system.models import (
     CustomUser, UserRole,
 )
 from apps.distribution.models import (

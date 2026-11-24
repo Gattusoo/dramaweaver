@@ -11,7 +11,7 @@ from datetime import timedelta
 from django.db import transaction
 from django.utils import timezone
 
-from dvadmin.utils import media as media_utils
+from apps.core.utils import media as media_utils
 from .models import Publication
 from apps.creation.models import TaskType
 

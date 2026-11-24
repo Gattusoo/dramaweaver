@@ -20,7 +20,7 @@ from apps.creation.workspace.export_service import (
 from apps.creation.workspace.import_precheck import ImportError_, precheck_import
 from apps.creation.workspace.import_service import confirm_import
 from apps.creation.workspace.storage import project_dir, save_asset_bytes
-from dvadmin.system.models import CustomUser, UserRole
+from apps.core.system.models import CustomUser, UserRole
 
 
 def _mk_member(play, user, role):

@@ -5,7 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from dvadmin.system.permissions import IsAdminOnly
+from apps.core.system.permissions import IsAdminOnly
 
 from apps.creation.views.base import PlayScopedViewSet
 

@@ -18,8 +18,8 @@ from apps.creation.models import (
 from apps.ai_gateway.models import AIModel, AIProvider
 from apps.distribution.models import DistributionChannel, Publication
 from apps.distribution import rendition as rendition_mod
-from dvadmin.system.models import CustomUser, UserRole
-from dvadmin.utils.url_safety import UnsafeURLError, check_url
+from apps.core.system.models import CustomUser, UserRole
+from apps.core.utils.url_safety import UnsafeURLError, check_url
 
 
 def _user(name, role):
@@ -319,7 +319,7 @@ class UrlSafetyTests(TestCase):
     """⑩ 共享地址与 site-local 地址视为内网。"""
 
     def test_cgnat_metadata_blocked(self):
-        from dvadmin.utils.url_safety import _is_public_ip
+        from apps.core.utils.url_safety import _is_public_ip
         import ipaddress
         self.assertFalse(_is_public_ip(ipaddress.ip_address("100.100.100.200")))
         self.assertFalse(_is_public_ip(ipaddress.ip_address("100.64.0.1")))

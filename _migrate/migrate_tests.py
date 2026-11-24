@@ -97,7 +97,7 @@ REL_REPLACES = [
     ("from .distribution import ", "from apps.distribution import "),
     ("from .pipeline.", "from apps.creation.pipeline."),
     ("from .pipeline import ", "from apps.creation.pipeline import "),
-    ("from .url_safety import ", "from dvadmin.utils.url_safety import "),
+    ("from .url_safety import ", "from apps.core.utils.url_safety import "),
     ("from .tasks import ", "from apps.creation.tasks import "),
 ]
 # from . import media / tasks / media, tasks
@@ -106,8 +106,8 @@ def rewrite_rel_imports(text):
         text = text.replace(old, new)
     # from . import media, tasks
     text = text.replace("from . import media, tasks",
-                        "from dvadmin.utils import media\nfrom apps.creation import tasks")
-    text = text.replace("from . import media", "from dvadmin.utils import media")
+                        "from apps.core.utils import media\nfrom apps.creation import tasks")
+    text = text.replace("from . import media", "from apps.core.utils import media")
     text = text.replace("from . import tasks", "from apps.creation import tasks")
     return text
 

@@ -10,7 +10,7 @@ from apps.creation.models import (
     PlayMember, ReviewLog,
 )
 from apps.distribution.models import Publication
-from dvadmin.system.models import CustomUser
+from apps.core.system.models import CustomUser
 
 PWD = "Passw0rd!123"
 

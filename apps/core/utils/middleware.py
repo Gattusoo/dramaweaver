@@ -6,7 +6,7 @@
 import logging
 import uuid
 
-logger = logging.getLogger("dvadmin.request")
+logger = logging.getLogger("apps.core.request")
 
 REQUEST_ID_HEADER = "X-Request-ID"
 

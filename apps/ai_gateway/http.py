@@ -20,7 +20,7 @@ from urllib.parse import urlsplit
 import httpx
 from django.conf import settings
 
-from dvadmin.utils.url_safety import UnsafeURLError, check_peer, check_url
+from apps.core.utils.url_safety import UnsafeURLError, check_peer, check_url
 
 logger = logging.getLogger(__name__)
 

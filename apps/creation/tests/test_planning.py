@@ -23,7 +23,7 @@ from apps.creation.assistant.planning import (
 )
 from apps.creation.models import AgentConfig, Play, PlayStatus, TaskStatus
 from apps.creation.tests.test_assistant import AssistantFixtureMixin, FakeChatGateway, _say, _use
-from dvadmin.system.models import CustomUser
+from apps.core.system.models import CustomUser
 
 
 def _mk_session(user=None):
@@ -406,7 +406,7 @@ class JsonExtractTests(TestCase):
 
 class PlanApiTests(TestCase):
     def setUp(self):
-        from dvadmin.system.models import UserRole
+        from apps.core.system.models import UserRole
         self.user = CustomUser.objects.create_user(username="plapi", password="t")
         self.user.role = UserRole.PRODUCER
         self.user.save()

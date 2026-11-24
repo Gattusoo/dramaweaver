@@ -18,7 +18,7 @@ from apps.distribution import views as distribution_views
 from apps.public_api import urls as public_api_urls
 
 # ─── 认证 ────────────────────────────────────────────────────────────────────
-from dvadmin.system.views import auth as auth_views
+from apps.core.system.views import auth as auth_views
 
 auth_patterns = [
     path("auth/register/", auth_views.RegisterView.as_view(), name="auth-register"),

@@ -14,7 +14,7 @@ from apps.creation.models import (
 from apps.creation.pipeline.local_backend import (
     PAID, PAID_CHECKPOINT, UnknownTaskError, recovery_class, retry_policy, send_task,
 )
-from dvadmin.system.models import CustomUser, UserRole
+from apps.core.system.models import CustomUser, UserRole
 
 
 class C1Fixture(TestCase):

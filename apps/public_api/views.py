@@ -13,7 +13,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.creation.models import Episode, Play, PlayStatus
-from dvadmin.utils.pagination import CustomPagination
+from apps.core.utils.pagination import CustomPagination
 
 from .serializers import (
     PublicPlayDetailSerializer, PublicPlaySerializer, PublicStatsSerializer,

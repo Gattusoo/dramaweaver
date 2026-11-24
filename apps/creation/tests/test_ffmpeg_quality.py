@@ -17,7 +17,7 @@ from apps.creation.models import (
 from apps.ai_gateway.models import (
     AIModel, AIProvider,
 )
-from dvadmin.system.models import (
+from apps.core.system.models import (
     CustomUser, UserRole,
 )
 from apps.distribution.models import (
@@ -80,7 +80,7 @@ class FiltergraphWatermarkTests(SimpleTestCase):
     """任务 5.2-5.3。"""
 
     def _spec(self, **kw):
-        from dvadmin.utils.media import parse_watermark
+        from apps.core.utils.media import parse_watermark
         return parse_watermark({"type": "image", "url": "u", **kw})
 
     def test_image_overlay_after_subtitles_only_in_body(self):
@@ -95,7 +95,7 @@ class FiltergraphWatermarkTests(SimpleTestCase):
         self.assertEqual(args[-4:], ["-loop", "1", "-i", "wm.png"])
 
     def test_text_watermark_bottom_avoids_subtitles(self):
-        from dvadmin.utils.media import parse_watermark
+        from apps.core.utils.media import parse_watermark
         spec = parse_watermark({"type": "text", "text": "出品", "position": "bottom_left", "margin": 20})
         wm = {"spec": spec, "textfile": "C:/t/wm.txt", "fontfile": "C:/Windows/Fonts/msyh.ttc"}
         script, *_ = _graph([_seg("body", 3.0, kind="image")], subtitle="sub.ass", watermark=wm,
@@ -250,7 +250,7 @@ class ComposeFixtureMixin:
         cover = (f"scale={self.W}:{self.H}:force_original_aspect_ratio=increase,"
                  f"crop={self.W}:{self.H},setsar=1,fps=30,format=yuv420p")
         for p in (patch("apps.creation.tasks._download", side_effect=fake_download),
-                  patch("dvadmin.utils.storage.save_artifact", side_effect=fake_save),
+                  patch("apps.core.utils.storage.save_artifact", side_effect=fake_save),
                   patch("apps.creation.pipeline.dispatcher.send_task", return_value=MagicMock(id="x")),
                   patch("apps.creation.tasks.W", self.W), patch("apps.creation.tasks.H", self.H),
                   patch("apps.creation.tasks._COVER", cover)):

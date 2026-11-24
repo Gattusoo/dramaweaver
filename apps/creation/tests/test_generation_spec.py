@@ -18,7 +18,7 @@ from apps.creation.pipeline.generation import (
     GENERATOR_VERSION, SPEC_SCHEMA_VERSION, fingerprint_of, normalize_spec, upstream_refs,
 )
 from apps.creation.tasks import generate_image, generate_tts
-from dvadmin.system.models import CustomUser, UserRole
+from apps.core.system.models import CustomUser, UserRole
 
 
 class MigrationTests(TestCase):

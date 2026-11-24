@@ -12,7 +12,7 @@ from apps.creation.models import (
     AgentConfig, Episode, MemberRole, MemberStatus, Play, PlayMember, PlayStatus,
     Scene, Shot, TaskRecord, TaskType,
 )
-from dvadmin.system.models import CustomUser
+from apps.core.system.models import CustomUser
 
 
 def _model(name, ptype, cost_config=None, priority=1):

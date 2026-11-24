@@ -10,8 +10,8 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from dvadmin.system.models import CustomUser
-from dvadmin.system.permissions import IsAdminOnly
+from apps.core.system.models import CustomUser
+from apps.core.system.permissions import IsAdminOnly
 
 from ..models import (
     Asset, AssetStatus, AssetType, Character, Episode, EpisodeStatus, Play,

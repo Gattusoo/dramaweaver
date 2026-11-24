@@ -3,7 +3,7 @@ import random
 
 from django.test import SimpleTestCase
 
-from dvadmin.utils import media
+from apps.core.utils import media
 from apps.creation.tasks import _xfade_timeline
 
 

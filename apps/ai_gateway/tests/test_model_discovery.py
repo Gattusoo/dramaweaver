@@ -9,7 +9,7 @@ import httpx
 from apps.ai_gateway.model_catalog import fetch_provider_models, KNOWN_MODELS
 from apps.ai_gateway.models import AIModel, AIProvider
 from apps.creation.models import AgentConfig
-from dvadmin.system.models import CustomUser, UserRole
+from apps.core.system.models import CustomUser, UserRole
 
 
 def _json_response(payload):

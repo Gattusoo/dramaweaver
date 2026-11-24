@@ -11,7 +11,7 @@ from apps.creation.models import (
     AgentConfig, Character, Episode, MemberRole, MemberStatus, Play, PlayMember,
     PlayStatus, Scene, Shot,
 )
-from dvadmin.system.models import CustomUser
+from apps.core.system.models import CustomUser
 
 
 def _sub(score=80, dims=None, **kw):

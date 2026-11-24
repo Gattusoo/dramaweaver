@@ -8,7 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from dvadmin.system.permissions import is_platform_admin
+from apps.core.system.permissions import is_platform_admin
 
 from ..models import Asset, AuditLog, Episode, Play, Scene, Shot, TaskRecord
 from ..permissions import _resolve_play

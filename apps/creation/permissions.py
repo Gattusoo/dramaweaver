@@ -2,7 +2,7 @@
 
 判定唯一来源：PlayMember（status=active）。全局角色（is_platform_admin）不赋予
 业务接口访问权——平台管理员的跨剧查看走审核通道（views/admin_review.py）。
-角色级权限（IsAdminOnly 等，读 is_platform_admin）在 dvadmin.system.permissions。
+角色级权限（IsAdminOnly 等，读 is_platform_admin）在 apps.core.system.permissions。
 """
 from django.db.models import Q
 from rest_framework import permissions

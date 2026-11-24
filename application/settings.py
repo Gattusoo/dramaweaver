@@ -154,11 +154,11 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ),
     "DEFAULT_RENDERER_CLASSES": (
-        "dvadmin.utils.renderers.CustomJSONRenderer",
+        "apps.core.utils.renderers.CustomJSONRenderer",
     ),
-    "DEFAULT_PAGINATION_CLASS": "dvadmin.utils.pagination.CustomPagination",
+    "DEFAULT_PAGINATION_CLASS": "apps.core.utils.pagination.CustomPagination",
     "PAGE_SIZE": 20,
-    "EXCEPTION_HANDLER": "dvadmin.utils.exception.custom_exception_handler",
+    "EXCEPTION_HANDLER": "apps.core.utils.exception.custom_exception_handler",
 }
 
 
@@ -173,7 +173,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
-    "dvadmin.system",
+    "apps.core.system",
     "channels",  # Phase 3.2：仅 protocol router（不用 layer/worker）
     "apps.ai_gateway",
     "apps.creation",
@@ -183,7 +183,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    "dvadmin.utils.middleware.RequestIDMiddleware",
+    "apps.core.utils.middleware.RequestIDMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",

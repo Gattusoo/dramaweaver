@@ -19,7 +19,7 @@ from apps.creation.models import (
     AgentConfig, Asset, AssetStatus, AssetType, Episode, Play, PlayStatus, Scene, Shot,
     TaskRecord, TaskType,
 )
-from dvadmin.system.models import CustomUser
+from apps.core.system.models import CustomUser
 
 VISION_ON = {"ENABLE_MULTIMODAL": True, "ENABLE_VISION_UNDERSTANDING": True}
 

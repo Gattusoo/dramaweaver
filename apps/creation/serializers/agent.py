@@ -22,7 +22,7 @@ class AgentConfigSerializer(serializers.ModelSerializer):
 
         非平台管理员试图开启（新建或把已有配方改为模板）时拒绝，防止自发布到全租户。"""
         if value:
-            from dvadmin.system.permissions import is_platform_admin
+            from apps.core.system.permissions import is_platform_admin
             request = self.context.get("request")
             user = getattr(request, "user", None)
             if user is None or not user.is_authenticated or \

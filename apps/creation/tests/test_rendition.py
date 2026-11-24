@@ -10,14 +10,14 @@ from django.conf import settings
 from django.test import SimpleTestCase, TestCase
 from rest_framework.test import APITestCase
 
-from dvadmin.utils import media
+from apps.core.utils import media
 from apps.distribution import rendition as rd
 from apps.distribution.publication import advance_status
 from apps.creation.models import (
     Asset, AssetStatus, AssetType, Episode, MemberRole, MemberStatus, Play, PlayMember,
     TaskRecord, TaskType,
 )
-from dvadmin.system.models import (
+from apps.core.system.models import (
     CustomUser, UserRole,
 )
 from apps.distribution.models import (
@@ -251,7 +251,7 @@ class RenderChannelVersionTests(RenditionStateMixin, TestCase):
             return f"/media/{subdir}/{filename}"
 
         for p in (patch("apps.creation.tasks._download", side_effect=fake_download),
-                  patch("dvadmin.utils.storage.save_artifact", side_effect=fake_save)):
+                  patch("apps.core.utils.storage.save_artifact", side_effect=fake_save)):
             p.start()
             self.addCleanup(p.stop)
 
@@ -277,7 +277,7 @@ class RenderChannelVersionTests(RenditionStateMixin, TestCase):
 
     def test_verification_failure_marks_failed(self):
         pub = self.pub({"resolution": "180x320"})
-        with patch("dvadmin.utils.media.rendition_filter",
+        with patch("apps.core.utils.media.rendition_filter",
                    return_value="[0:v]scale=200:320,setsar=1,format=yuv420p[vout]"):
             r = self.run_task(pub)
         self.assertEqual(r["status"], rd.FAILED)

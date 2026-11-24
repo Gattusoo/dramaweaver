@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, patch
 from rest_framework.test import APIClient
 
 from apps.creation.models import PlayStatus
-from dvadmin.system.models import UserRole
+from apps.core.system.models import UserRole
 
 from .test_pipeline import BasePipelineTest
 

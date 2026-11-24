@@ -17,7 +17,7 @@ from rest_framework.test import APIClient
 from apps.ai_gateway.models import (
     AIModel, AIProvider, ProviderType, ProviderVisibility, UserProviderCredential,
 )
-from dvadmin.utils.encryption import EncryptionError, decrypt_value, encrypt_value
+from apps.core.utils.encryption import EncryptionError, decrypt_value, encrypt_value
 
 User = get_user_model()
 
@@ -44,7 +44,7 @@ def _mk_provider(name, *, visibility=ProviderVisibility.CUSTOM, created_by=None,
 
 
 def _unwrap(resp):
-    """dvadmin envelope：{code, msg, data}；返回 (data, raw_json)。"""
+    """apps.core envelope：{code, msg, data}；返回 (data, raw_json)。"""
     body = resp.json()
     if isinstance(body, dict) and "data" in body and "code" in body:
         return body["data"], body
@@ -61,7 +61,7 @@ def _errors_of(resp):
 
 
 class EncryptionUtilTests(TestCase):
-    """dvadmin.utils.encryption：Fernet 加解密 + 版本前缀 + 目的隔离。"""
+    """apps.core.utils.encryption：Fernet 加解密 + 版本前缀 + 目的隔离。"""
 
     def test_encrypt_decrypt_round_trip(self):
         cipher = encrypt_value("sk-test-12345", purpose="user_provider_credential")

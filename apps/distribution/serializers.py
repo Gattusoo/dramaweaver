@@ -1,7 +1,7 @@
 """distribution serializers。"""
 from rest_framework import serializers
 
-from dvadmin.utils.media import validate_requirements
+from apps.core.utils.media import validate_requirements
 
 from .models import DistributionChannel, Publication, SubtitleTrack
 

@@ -13,7 +13,7 @@ from apps.creation.models import (
     AgentConfig, Asset, AssetStatus, AssetType, Episode, Play, PlayStatus, TaskRecord,
     TaskStatus, TaskType,
 )
-from dvadmin.system.models import CustomUser, UserRole
+from apps.core.system.models import CustomUser, UserRole
 
 from .test_assistant import AssistantFixtureMixin, FakeChatGateway, _say, _use
 

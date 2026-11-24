@@ -13,7 +13,7 @@ from apps.creation.models import (
     AgentConfig, Asset, AssetStatus, AssetType, Character, Episode, MemberRole,
     MemberStatus, Play, PlayMember, PlayStatus, Scene, Shot,
 )
-from dvadmin.system.models import CustomUser
+from apps.core.system.models import CustomUser
 
 
 def _make_proposal(play, session, kind, **kw):

@@ -14,7 +14,7 @@ from apps.creation.pipeline.preview_redo import (
     PreviewRedoError, preview_redo, verify_preview_version,
 )
 from apps.creation.pipeline.redo import RedoError, redo
-from dvadmin.system.models import CustomUser, UserRole
+from apps.core.system.models import CustomUser, UserRole
 
 
 def _mk_member(play, user, role):

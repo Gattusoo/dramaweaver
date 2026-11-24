@@ -182,7 +182,7 @@ class NodeGenerateTests(CanvasFixture, TestCase):
         self.assertEqual(resp.status_code, 403)
 
     def test_non_member_404(self):
-        from dvadmin.system.models import CustomUser
+        from apps.core.system.models import CustomUser
         stranger = CustomUser.objects.create_user(username="canvas_stranger",
                                                   password="Passw0rd!123")
         resp = self.post_generate(stranger, self.flow_node)

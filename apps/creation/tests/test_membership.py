@@ -13,7 +13,7 @@ from apps.creation.models import (
 from apps.creation.assistant.models import (
     AssistantProposal, AssistantSession, ProposalKind, ProposalStatus,
 )
-from dvadmin.system.models import CustomUser
+from apps.core.system.models import CustomUser
 
 PWD = "Passw0rd!123"
 
@@ -280,7 +280,7 @@ class AccountDeletionTests(MembershipBase):
     def test_owner_account_deletion_blocked(self):
         from django.db import transaction
 
-        from dvadmin.system.signals import AccountDeletionBlocked
+        from apps.core.system.signals import AccountDeletionBlocked
 
         # 显式 savepoint：Model.delete 的 savepoint=False 事务在 TestCase 外层
         # atomic 内无法回滚，异常会把连接标记为 broken（仅测试环境有此限制）

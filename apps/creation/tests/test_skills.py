@@ -9,7 +9,7 @@ from apps.creation.assistant.models import AssistantSession
 from apps.creation.assistant.runner import system_prompt
 from apps.creation.assistant.tools import ToolContext, get_tool, run_tool
 from apps.creation.models import AgentConfig, Play, PlayStatus
-from dvadmin.system.models import CustomUser
+from apps.core.system.models import CustomUser
 
 BUILTIN = Path(sk.__file__).resolve().parent / "builtin" / "skills"
 

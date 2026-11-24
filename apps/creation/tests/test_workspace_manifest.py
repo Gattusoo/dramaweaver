@@ -20,7 +20,7 @@ from apps.creation.workspace.manifest import (
 )
 from apps.creation.workspace.save_service import save_play
 from apps.creation.workspace.storage import project_dir
-from dvadmin.system.models import CustomUser, UserRole
+from apps.core.system.models import CustomUser, UserRole
 
 
 def _mk_member(play, user, role):

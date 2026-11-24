@@ -22,7 +22,7 @@ from apps.creation.tests.test_production import FakeGateway
 from apps.creation.workspace.export_service import build_export_zip
 from apps.creation.workspace.import_precheck import precheck_import
 from apps.creation.workspace.import_service import confirm_import
-from dvadmin.system.models import CustomUser, UserRole
+from apps.core.system.models import CustomUser, UserRole
 
 
 def _gateway():

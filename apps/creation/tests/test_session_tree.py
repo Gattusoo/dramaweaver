@@ -18,7 +18,7 @@ from apps.creation.assistant.session_tree import (
 )
 from apps.creation.models import AgentConfig, Play, PlayStatus
 from apps.creation.tests.test_assistant import AssistantFixtureMixin
-from dvadmin.system.models import CustomUser
+from apps.core.system.models import CustomUser
 
 
 class SessionTreeTests(TestCase):

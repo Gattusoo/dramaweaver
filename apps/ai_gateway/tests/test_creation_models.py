@@ -3,7 +3,7 @@ from rest_framework.test import APITestCase
 
 from apps.ai_gateway.models import AIModel, AIProvider
 from apps.creation.models import MemberRole, MemberStatus, Play, PlayMember
-from dvadmin.system.models import CustomUser
+from apps.core.system.models import CustomUser
 
 GEN = {
     "create_types": ["文生短剧", "图生短剧"],
