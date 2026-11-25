@@ -88,6 +88,12 @@ def _billing_gate(record, task_type, play):
     通过 → 返回 HoldResult|None（写 input_summary["billing_hold"]）并置位已发凭证；
     拒绝 → record 置 FAILED（error_message 记原因），返回 None。
     估算失败（无单价）以 0 预扣照常派发；ENABLE_BILLING_HOLD=false / local 短路。
+
+    **异步契约**：本路径没有同步 HTTP 响应（请求已返回 202 + task_record_id），
+    因此拒绝以 FAILED TaskRecord 表达，error_message 前缀固定为
+    「钱包余额不足：」「每日渲染时长超限：」「并发槽位已满：」（前端已消费，
+    视为临时稳定标记）。同步 402/4001、402/4029、409/4090 仅适用于
+    assistant 发送与 Play start 预检（见 design D1），不要在异步路径仿造 402。
     """
     from apps.billing.services.gate import (
         InsufficientPoints, QuotaExceeded, dispatch_gate, release_after_dispatch,

@@ -274,6 +274,77 @@ class RemovalDispositionTests(MembershipBase):
         self.assertEqual(running.status, TaskStatus.RUNNING)
 
 
+class ReacceptAfterRemovalTests(MembershipBase):
+    """2026-11-25：被移除成员重新受邀→接受，成员行就地激活（单行模型）。
+
+    并发说明（design D3）：接受路径未对 PlayInvitation 行加锁（既有行为），
+    同一邀请并发接受属未覆盖场景；如需强一致后续再评估 select_for_update。
+    """
+
+    def _invite_accept(self, role):
+        self.client.force_authenticate(self.owner)
+        resp = self.client.post(
+            f"/api/plays/{self.play.pk}/invite/",
+            {"user_ids": [self.editor.pk], "role": role}, format="json",
+        )
+        self.assertEqual(resp.status_code, 201, resp.content)
+        invitation_id = resp.data["invitations"][0]["id"]
+        self.client.force_authenticate(self.editor)
+        resp = self.client.post(
+            "/api/plays/invitations/accept/",
+            {"invitation_id": invitation_id}, format="json",
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        return invitation_id
+
+    def _remove(self):
+        self.client.force_authenticate(self.owner)
+        resp = self.client.post(
+            f"/api/plays/{self.play.pk}/members/remove/",
+            {"user_ids": [self.editor.pk]}, format="json",
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+
+    def test_removed_member_can_rejoin_once_more(self):
+        """邀请→接受→移除→再邀请→接受：第二次不再 500，成员行就地激活。"""
+        first_invite = self._invite_accept("editor")
+        self._remove()
+        second_invite = self._invite_accept("editor")
+
+        rows = PlayMember.objects.filter(play=self.play, user=self.editor)
+        self.assertEqual(rows.count(), 1, "成员行必须单行就地激活，不得新增")
+        row = rows.get()
+        self.assertEqual(row.status, MemberStatus.ACTIVE)
+        self.assertEqual(row.role, MemberRole.EDITOR)
+
+        # 两次接受均写审计，target 为各自邀请（target_id 为字符串列）
+        targets = set(
+            AuditLog.objects.filter(
+                play=self.play, action="member_accept",
+                target_type="invitation",
+            ).values_list("target_id", flat=True)
+        )
+        self.assertEqual(targets, {str(first_invite), str(second_invite)})
+
+    def test_rejoin_updates_role_to_latest_invitation(self):
+        """editor 被移除后以 viewer 重新加入：role 以第二次邀请为准。"""
+        self._invite_accept("editor")
+        self._remove()
+        self._invite_accept("viewer")
+
+        row = PlayMember.objects.get(play=self.play, user=self.editor)
+        self.assertEqual(row.role, MemberRole.VIEWER)
+        self.assertEqual(row.status, MemberStatus.ACTIVE)
+
+        # 成员列表中只回显一行
+        self.client.force_authenticate(self.owner)
+        resp = self.client.get(f"/api/plays/{self.play.pk}/")
+        members = resp.data.get("members", [])
+        self.assertEqual(
+            len([m for m in members if m.get("user") == self.editor.pk]), 1
+        )
+
+
 class AccountDeletionTests(MembershipBase):
     """任务 4.4：有 owner 剧未处置则拒绝注销；参与剧的成员行随注销清理。"""
 
@@ -357,6 +428,46 @@ class TransferTests(MembershipBase):
             {"to_user": self.viewer.pk}, format="json",
         )
         self.assertEqual(resp.status_code, 400)
+
+    def test_stale_viewer_invitation_cannot_demote_new_owner(self):
+        """转让前遗留的普通邀请在转让后被撤销，不得把 OWNER 成员行降级。"""
+        PlayMember.objects.create(
+            play=self.play, user=self.editor, role=MemberRole.EDITOR,
+            status=MemberStatus.ACTIVE,
+        )
+        self.client.force_authenticate(self.owner)
+        invite_resp = self.client.post(
+            f"/api/plays/{self.play.pk}/invite/",
+            {"user_ids": [self.editor.pk], "role": "viewer"}, format="json",
+        )
+        self.assertEqual(invite_resp.status_code, 201, invite_resp.content)
+        stale_id = invite_resp.data["invitations"][0]["id"]
+        transfer_resp = self.client.post(
+            f"/api/plays/{self.play.pk}/transfer-ownership/",
+            {"to_user": self.editor.pk}, format="json",
+        )
+        self.assertEqual(transfer_resp.status_code, 200, transfer_resp.content)
+        transfer_id = transfer_resp.data["invitation_id"]
+
+        self.client.force_authenticate(self.editor)
+        resp = self.client.post(
+            "/api/plays/invitations/accept/", {"invitation_id": transfer_id},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+
+        # 遗留 viewer 邀请已被撤销 → 409；成员行仍是 OWNER
+        resp = self.client.post(
+            "/api/plays/invitations/accept/", {"invitation_id": stale_id},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 409, resp.content)
+        self.assertEqual(
+            PlayMember.objects.get(play=self.play, user=self.editor).role,
+            MemberRole.OWNER,
+        )
+        self.play.refresh_from_db()
+        self.assertEqual(self.play.created_by, self.editor)
 
 
 class AdminChannelTests(MembershipBase):

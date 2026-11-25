@@ -224,6 +224,180 @@ class CredentialAPITests(TestCase):
         self.assertFalse(body["ok"])
         self.assertIn("鉴权", body["reason"])
 
+    # ─── 2026-11-25 消费缺口：属主绑定 / 重复 400 / 稳定排序 ───────────────
+
+    def test_credential_owner_binding_rejects_others_custom_provider(self):
+        """凭证只能配在本人创建的自定义供应商上；他人 custom → 400。"""
+        resp = self.client_bob.post("/api/user-credentials/", {
+            "provider": self.provider.pk,  # bob 不是该 custom 行属主
+            "api_key": "sk-bob",
+        }, format="json")
+        self.assertEqual(resp.status_code, 400, resp.content)
+        errors = _errors_of(resp)
+        self.assertIn("provider", errors)
+        self.assertIn("只能为自己的自定义供应商", str(errors["provider"]))
+        self.assertEqual(UserProviderCredential.objects.count(), 0)
+
+    def test_duplicate_credential_returns_400_not_500(self):
+        first = self._create_credential(self.client_alice)
+        self.assertEqual(first.status_code, 201)
+        second = self._create_credential(self.client_alice, plain="sk-second")
+        self.assertEqual(second.status_code, 400, second.content)
+        errors = _errors_of(second)
+        self.assertEqual(errors["provider"], ["该供应商已存在凭证。"])
+        self.assertEqual(
+            UserProviderCredential.objects.filter(
+                user=self.alice, provider=self.provider
+            ).count(),
+            1,
+        )
+
+    def test_patch_same_credential_not_treated_as_duplicate(self):
+        """更新排除自身：PATCH 自己的凭证改 label 不应触发重复校验。"""
+        create_resp = self._create_credential(self.client_alice)
+        body, _ = _unwrap(create_resp)
+        cred_id = body["id"]
+        resp = self.client_alice.patch(
+            f"/api/user-credentials/{cred_id}/", {"label": "改名"}, format="json"
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+
+    def test_integrity_error_on_create_returns_400(self):
+        """并发兜底：预查通过但插入撞唯一约束 → 400 同形文案，不 500。"""
+        from django.db import IntegrityError as DjangoIntegrityError
+        from rest_framework import serializers
+        from rest_framework.test import APIRequestFactory
+
+        from apps.ai_gateway.serializers import UserProviderCredentialSerializer
+
+        # 模拟另一个并发事务已插入同一 (user, provider) 行
+        UserProviderCredential.objects.create(
+            user=self.alice, provider=self.provider, encrypted_key="v1:exists",
+        )
+        request = APIRequestFactory().post("/api/user-credentials/")
+        request.user = self.alice
+        serializer = UserProviderCredentialSerializer(context={"request": request})
+        with patch(
+            "apps.ai_gateway.models.UserProviderCredential.save",
+            side_effect=DjangoIntegrityError("uniq_user_provider_credential"),
+        ):
+            with self.assertRaises(serializers.ValidationError) as ctx:
+                serializer.create({"provider": self.provider, "api_key": "sk-new"})
+        self.assertEqual(ctx.exception.detail["provider"], ["该供应商已存在凭证。"])
+
+    def test_integrity_error_on_update_returns_400(self):
+        """update() 同样把并发唯一冲突翻译为 400，而非 500。"""
+        from django.db import IntegrityError as DjangoIntegrityError
+        from rest_framework import serializers
+        from rest_framework.test import APIRequestFactory
+
+        from apps.ai_gateway.serializers import UserProviderCredentialSerializer
+
+        other_provider = _mk_provider("Other Custom", created_by=self.alice)
+        credential = UserProviderCredential.objects.create(
+            user=self.alice, provider=self.provider, encrypted_key="v1:a",
+        )
+        UserProviderCredential.objects.create(
+            user=self.alice, provider=other_provider, encrypted_key="v1:b",
+        )
+        request = APIRequestFactory().patch("/")
+        request.user = self.alice
+        serializer = UserProviderCredentialSerializer(
+            instance=credential, context={"request": request},
+        )
+        with patch(
+            "apps.ai_gateway.models.UserProviderCredential.save",
+            side_effect=DjangoIntegrityError("uniq_user_provider_credential"),
+        ):
+            with self.assertRaises(serializers.ValidationError) as ctx:
+                serializer.update(
+                    credential,
+                    {"provider": other_provider, "api_key": "sk-new"},
+                )
+        self.assertEqual(ctx.exception.detail["provider"], ["该供应商已存在凭证。"])
+
+    def test_change_provider_requires_new_api_key(self):
+        create_resp = self._create_credential(self.client_alice)
+        body, _ = _unwrap(create_resp)
+        other_provider = _mk_provider("Other Custom", created_by=self.alice)
+        resp = self.client_alice.patch(
+            f"/api/user-credentials/{body['id']}/",
+            {"provider": other_provider.pk}, format="json",
+        )
+        self.assertEqual(resp.status_code, 400, resp.content)
+        self.assertIn("api_key", _errors_of(resp))
+
+    def test_change_provider_with_key_clears_verification(self):
+        from django.utils import timezone
+
+        create_resp = self._create_credential(self.client_alice)
+        body, _ = _unwrap(create_resp)
+        credential = UserProviderCredential.objects.get(pk=body["id"])
+        credential.last_verified_at = timezone.now()
+        credential.save(update_fields=["last_verified_at"])
+        other_provider = _mk_provider("Other Custom", created_by=self.alice)
+
+        resp = self.client_alice.patch(
+            f"/api/user-credentials/{credential.pk}/",
+            {"provider": other_provider.pk, "api_key": "sk-new"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        credential.refresh_from_db()
+        self.assertIsNone(credential.last_verified_at)
+        self.assertEqual(credential.provider_id, other_provider.pk)
+
+    def test_credential_list_stable_order(self):
+        """分页稳定：两次请求的 id 顺序一致（-created_at, -id）。"""
+        providers = [self.provider] + [
+            _mk_provider(f"P{i}", created_by=self.alice) for i in range(2)
+        ]
+        created = []
+        for p in providers:
+            resp = self.client_alice.post("/api/user-credentials/", {
+                "provider": p.pk, "api_key": "sk-test",
+            }, format="json")
+            self.assertEqual(resp.status_code, 201, resp.content)
+            body, _ = _unwrap(resp)
+            created.append(body["id"])
+
+        def ids():
+            body, _ = _unwrap(self.client_alice.get("/api/user-credentials/"))
+            rows = body.get("results", body) if isinstance(body, dict) else body
+            return [r["id"] for r in rows]
+
+        first, second = ids(), ids()
+        self.assertEqual(len(first), 3)
+        self.assertEqual(first, second)
+        # 断言文档承诺的 newest-first（-created_at, -id），而非仅「两次一致」
+        self.assertEqual(first, list(reversed(created)))
+
+
+class CredentialRuntimeOwnershipTests(TestCase):
+    """运行期凭证解析还须校验供应商属主（历史越权绑定行不生效）。"""
+
+    def setUp(self):
+        self.alice = _mk_user("runtime-alice")
+        self.bob = _mk_user("runtime-bob")
+        self.provider = _mk_provider("Bob Private", created_by=self.bob)
+
+    def test_cross_owner_legacy_credential_not_resolved(self):
+        UserProviderCredential.objects.create(
+            user=self.alice, provider=self.provider, encrypted_key="v1:x",
+        )
+        from apps.ai_gateway.credentials import resolve_api_key, resolve_credential
+
+        self.assertIsNone(resolve_credential(self.alice, self.provider))
+        self.assertEqual(resolve_api_key(self.alice, self.provider), (None, ""))
+
+    def test_owner_credential_still_resolved(self):
+        credential = UserProviderCredential.objects.create(
+            user=self.bob, provider=self.provider, encrypted_key="v1:x",
+        )
+        from apps.ai_gateway.credentials import resolve_credential
+
+        self.assertEqual(resolve_credential(self.bob, self.provider), credential)
+
 
 class AIProviderVisibilityTests(TestCase):
     """AIProvider visibility 字段 + 行级权限（任务 2.3）。"""
@@ -304,6 +478,56 @@ class AIProviderVisibilityTests(TestCase):
         self.assertEqual(resp.status_code, 400)
         errors = _errors_of(resp)
         self.assertIn("api_key_encrypted", errors)
+
+    def test_user_patch_platform_row_returns_403(self):
+        """对象级权限先于请求体校验：PATCH platform 行 → 403（不是 400）。"""
+        platform_provider = _mk_provider(
+            "Platform DS", visibility=ProviderVisibility.PLATFORM, api_key="k",
+        )
+        resp = self.client_alice.patch(
+            f"/api/ai-providers/{platform_provider.pk}/", {"name": "hack"}, format="json"
+        )
+        self.assertEqual(resp.status_code, 403, resp.content)
+        platform_provider.refresh_from_db()
+        self.assertEqual(platform_provider.name, "Platform DS")
+
+    def test_user_patch_own_custom_returns_200(self):
+        custom = _mk_provider("Mine", created_by=self.alice)
+        resp = self.client_alice.patch(
+            f"/api/ai-providers/{custom.pk}/", {"name": "Mine 2"}, format="json"
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+
+    def test_user_patch_others_custom_returns_404(self):
+        bob = _mk_user("bob")
+        client_bob = APIClient()
+        client_bob.force_authenticate(bob)
+        custom = _mk_provider("Alice's", created_by=self.alice)
+        resp = client_bob.patch(
+            f"/api/ai-providers/{custom.pk}/", {"name": "hack"}, format="json"
+        )
+        self.assertEqual(resp.status_code, 404)
+
+    @override_settings(SERVICE_FEE_PER_CALL=5)
+    def test_service_fee_per_call_readonly_disclosure(self):
+        """custom 行回显部署费率；platform 行为 null；只读不可写。"""
+        platform = _mk_provider(
+            "Platform DS", visibility=ProviderVisibility.PLATFORM, api_key="k",
+        )
+        custom = _mk_provider("Mine", created_by=self.alice)
+        body, _ = _unwrap(self.client_alice.get("/api/ai-providers/"))
+        rows = body.get("results", body) if isinstance(body, dict) else body
+        by_id = {r["id"]: r for r in rows}
+        self.assertIsNone(by_id[platform.pk]["service_fee_per_call"])
+        self.assertEqual(by_id[custom.pk]["service_fee_per_call"], 5)
+        # 只读：PATCH 携带该字段被忽略，实际仍由配置决定
+        resp = self.client_alice.patch(
+            f"/api/ai-providers/{custom.pk}/",
+            {"name": "Mine2", "service_fee_per_call": 999}, format="json",
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        body, _ = _unwrap(resp)
+        self.assertEqual(body["service_fee_per_call"], 5)
 
 
 class RecipeReferenceValidationTests(TestCase):

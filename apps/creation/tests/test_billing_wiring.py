@@ -257,7 +257,12 @@ class AssistantGateTests(AssistantFixtureMixin, TestCase):
         WalletEntry.objects.filter(wallet=wallet).delete()
         resp = self._post_message()
         self.assertEqual(resp.status_code, 402, resp.data)
-        self.assertEqual(resp.data.get("reason"), "insufficient_points")
+        body = resp.json()
+        self.assertEqual(body["code"], 4001)  # 402 → 4001 信封码
+        self.assertEqual(body["reason"], "insufficient_points")
+        self.assertIn("needed", body)      # 顶层字段（design D3）
+        self.assertEqual(body["balance"], 0)
+        self.assertIsNone(body["data"])
 
     def test_slot_full_returns_409(self):
         from apps.billing.services.quotas import acquire_slot
@@ -287,3 +292,137 @@ class LocalModeBypassTests(BillingWiringFixture):
             self.assertEqual(record.status, TaskStatus.PENDING)
             fake_send.assert_called_once()
             self.assertNotIn("billing_hold", record.input_summary)
+
+
+class StartPreflightTests(BillingWiringFixture):
+    """2026-11-25：Play start 同步预检（拒绝不迁移状态、不建 TaskRecord）。"""
+
+    def setUp(self):
+        super().setUp()
+        from apps.creation.models import (
+            Episode, MemberRole, MemberStatus, PlayMember,
+        )
+        from rest_framework.test import APIClient
+
+        Episode.objects.create(play=self.play, episode_number=1)
+        # 业务接口按成员表鉴权：补属主成员行（billing fixture 建剧未走信号）
+        PlayMember.objects.create(
+            play=self.play, user=self.owner, role=MemberRole.OWNER,
+            status=MemberStatus.ACTIVE,
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(self.owner)
+        self.url = f"/api/plays/{self.play.pk}/start/"
+
+    def _drain_wallet(self):
+        wallet = Wallet.objects.get(user=self.owner)
+        Wallet.objects.filter(pk=wallet.pk).update(balance=0)
+        WalletEntry.objects.filter(wallet=wallet).delete()
+
+    def test_insufficient_balance_blocks_start(self):
+        self._drain_wallet()
+        resp = self.client.post(self.url)
+        self.assertEqual(resp.status_code, 402, resp.data)
+        body = resp.json()
+        self.assertEqual(body["code"], 4001)
+        self.assertEqual(body["reason"], "insufficient_points")
+        self.assertIn("needed", body)
+        self.assertEqual(body["balance"], 0)
+        self.assertIsNone(body["data"])
+        self.play.refresh_from_db()
+        self.assertEqual(self.play.status, "DRAFT")
+        self.assertFalse(TaskRecord.objects.filter(play=self.play).exists())
+
+    @override_settings(DAILY_RENDER_SECONDS_LIMIT=1)
+    def test_daily_render_exhausted_blocks_start(self):
+        consume_daily_render(self.owner.pk, 1)  # used == limit：真正的「用完」
+        resp = self.client.post(self.url)
+        self.assertEqual(resp.status_code, 402, resp.data)
+        body = resp.json()
+        self.assertEqual(body["code"], 4029)
+        self.assertEqual(body["reason"], "daily_render_exhausted")
+        self.play.refresh_from_db()
+        self.assertEqual(self.play.status, "DRAFT")
+        self.assertFalse(TaskRecord.objects.filter(play=self.play).exists())
+
+    @override_settings(DAILY_RENDER_SECONDS_LIMIT=1)
+    def test_daily_render_not_exhausted_allows_start(self):
+        """OUTLINE 为零渲染秒的 ai 任务：额度尚有余量时不得按 60s 误拦。"""
+        fake_result = MagicMock()
+        fake_result.id = "fake-uuid"
+        with patch.object(dispatcher, "send_task", return_value=fake_result):
+            resp = self.client.post(self.url)
+        self.assertEqual(resp.status_code, 200, resp.data)
+        self.play.refresh_from_db()
+        self.assertEqual(self.play.status, "OUTLINING")
+
+    def test_null_creator_skips_preflight(self):
+        """created_by 可空：与 dispatcher 计费守卫一致，跳过预检而非 500。"""
+        Play.objects.filter(pk=self.play.pk).update(created_by=None)
+        fake_result = MagicMock()
+        fake_result.id = "fake-uuid"
+        with patch.object(dispatcher, "send_task", return_value=fake_result):
+            resp = self.client.post(self.url)
+        self.assertEqual(resp.status_code, 200, resp.data)
+        self.play.refresh_from_db()
+        self.assertEqual(self.play.status, "OUTLINING")
+        self.assertIsNone(self.play.created_by_id)
+
+    def test_slot_full_blocks_start(self):
+        from apps.billing.services.quotas import acquire_slot
+        for _ in range(10):  # 默认 ai 槽位上限 10
+            acquire_slot(self.owner, "ai")
+        resp = self.client.post(self.url)
+        self.assertEqual(resp.status_code, 409, resp.data)
+        self.assertEqual(resp.json()["reason"], "quota_exceeded")
+        self.play.refresh_from_db()
+        self.assertEqual(self.play.status, "DRAFT")
+        self.assertFalse(TaskRecord.objects.filter(play=self.play).exists())
+
+    def test_successful_start_still_transitions_and_dispatches(self):
+        fake_result = MagicMock()
+        fake_result.id = "fake-uuid"
+        with patch.object(dispatcher, "send_task", return_value=fake_result) as fake_send:
+            resp = self.client.post(self.url)
+        self.assertEqual(resp.status_code, 200, resp.data)
+        self.play.refresh_from_db()
+        self.assertEqual(self.play.status, "OUTLINING")
+        fake_send.assert_called_once()
+        self.assertTrue(
+            TaskRecord.objects.filter(play=self.play, task_type=TaskType.OUTLINE).exists()
+        )
+
+    def test_preflight_is_readonly(self):
+        """预检本身不写 WalletEntry、不动余额，槽位探针立即归还。"""
+        from apps.billing.services.gate import preflight
+        from apps.billing.services.quotas import _slot_count
+        from apps.ai_gateway.redis_client import get_store
+
+        balance_before = Wallet.objects.get(user=self.owner).balance
+        entries_before = WalletEntry.objects.filter(wallet__user=self.owner).count()
+
+        preflight(self.owner, 500, slot_kind="ai", daily_seconds=60)
+
+        self.assertEqual(
+            Wallet.objects.get(user=self.owner).balance, balance_before
+        )
+        self.assertEqual(
+            WalletEntry.objects.filter(wallet__user=self.owner).count(),
+            entries_before,
+        )
+        self.assertEqual(_slot_count(get_store(), "ai", self.owner.pk), 0)
+
+    def test_preflight_insufficient_does_not_write(self):
+        from apps.billing.services.gate import preflight
+        from apps.billing.services.wallet import InsufficientPoints
+
+        self._drain_wallet()
+        entries_before = WalletEntry.objects.filter(wallet__user=self.owner).count()
+        with self.assertRaises(InsufficientPoints) as ctx:
+            preflight(self.owner, 500, slot_kind="ai", daily_seconds=60)
+        self.assertEqual(ctx.exception.needed, 500)
+        self.assertEqual(ctx.exception.balance, 0)
+        self.assertEqual(
+            WalletEntry.objects.filter(wallet__user=self.owner).count(),
+            entries_before,
+        )

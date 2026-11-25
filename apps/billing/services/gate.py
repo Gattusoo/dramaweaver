@@ -13,7 +13,10 @@ import logging
 
 from django.conf import settings
 
-from .quotas import QuotaExceeded, acquire_slot, release_slot
+from .quotas import (
+    QuotaExceeded, acquire_slot, check_daily_render_exhausted, release_slot,
+    slot_available,
+)
 from .wallet import InsufficientPoints, HoldResult, hold_for_task
 
 logger = logging.getLogger(__name__)
@@ -67,6 +70,48 @@ def release_after_dispatch(owner, result: HoldResult | None, slot_kind: str | No
     """派发完成后的槽位释放（hold 保持冻结直到任务结束）。"""
     if slot_kind and getattr(settings, "ENABLE_BILLING_HOLD", True):
         release_slot(owner, slot_kind)
+
+
+def preflight(owner, estimate_points: int, *, slot_kind: str | None = None,
+              daily_seconds: int | None = None,
+              daily_exhausted_only: bool = False) -> None:
+    """同步启动预检（Play start 用）：只读，不写 WalletEntry、不改余额终态。
+
+    顺序与 dispatch_gate 一致：每日渲染时长 → 并发槽位 → 余额。
+    每日额度有两种只读语义：
+      - daily_seconds > 0：按未来消耗预留检查（used + seconds > limit）；
+      - daily_exhausted_only=True：只拒绝「已经用完」（used >= limit），
+        供 OUTLINE 等非渲染任务使用（其异步派发本就不查日限）。
+    槽位用只读计数比较（slot_available），不再 acquire+release 写入探针。
+    拒绝时抛 QuotaExceeded（每日/槽位）或 InsufficientPoints（余额），
+    与派发闸同款异常供视图映射 402/4001、402/4029、409/4090。
+
+    Design D2 竞态登记：预检通过后、实际派发前余额/槽位可能被并发消耗，
+    此时仍可能留下 FAILED TaskRecord + OUTLINING；不引入状态回退协议。
+    """
+    if not getattr(settings, "ENABLE_BILLING_HOLD", True):
+        return
+    if getattr(settings, "IS_LOCAL_MODE", False):
+        return
+    if owner is None:  # created_by 可空（历史/后台建剧）：与 dispatcher 一致跳过
+        return
+
+    if daily_exhausted_only:
+        check_daily_render_exhausted(owner)
+    elif daily_seconds:
+        from .quotas import check_daily_render
+        check_daily_render(owner, daily_seconds)
+
+    if slot_kind and not slot_available(owner, slot_kind):
+        raise QuotaExceeded(
+            f"{slot_kind}_slots", f"并发 {slot_kind} 槽位已满，请稍后重试")
+
+    if estimate_points and estimate_points > 0:
+        from ..models import Wallet
+        wallet = Wallet.objects.filter(user=owner).first()
+        balance = wallet.balance if wallet is not None else 0
+        if balance < estimate_points:
+            raise InsufficientPoints(estimate_points, balance)
 
 
 class TaskOutcome:

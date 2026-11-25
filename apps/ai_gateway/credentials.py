@@ -20,9 +20,12 @@ def resolve_credential(user, provider: AIProvider) -> Optional[UserProviderCrede
     """取 user 对 provider 的可用凭证；无则返回 None（调用方按"节点不可用跳过"处理）。
 
     - platform 行不查凭证表（平台 Key 走 AIProvider.api_key_encrypted）
-    - custom 行查 (user, provider, is_active=True) 的唯一凭证
+    - custom 行：provider 必须由 user 本人创建，再查 (user, provider, is_active=True)
+      唯一凭证。运行期同样校验属主，避免历史越权绑定行（写侧已拒绝新建）继续生效。
     """
     if provider.visibility == ProviderVisibility.PLATFORM:
+        return None
+    if user is None or provider.created_by_id != user.id:
         return None
     return UserProviderCredential.objects.filter(
         user=user, provider=provider, is_active=True,

@@ -516,9 +516,13 @@ def _assistant_billing_gate(record):
         TaskRecord.objects.filter(pk=record.pk).update(
             status=TaskStatus.FAILED,
             error_message=f"钱包余额不足：{exc}")
-        return Response({"detail": f"积分余额不足，请充值后重试：{exc}",
-                         "reason": "insufficient_points"},
+        resp = Response({"detail": f"积分余额不足，请充值后重试：{exc}",
+                         "reason": "insufficient_points",
+                         "needed": exc.needed,
+                         "balance": exc.balance},
                         status=status.HTTP_402_PAYMENT_REQUIRED)
+        resp.business_code = 4001  # 渲染器默认 402→4001；显式挂码防默认映射漂移
+        return resp
     except QuotaExceeded as exc:
         TaskRecord.objects.filter(pk=record.pk).update(
             status=TaskStatus.FAILED,

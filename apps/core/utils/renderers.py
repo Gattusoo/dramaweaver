@@ -10,6 +10,8 @@ from rest_framework.renderers import JSONRenderer
 # 业务错误码
 CODE_OK = 2000
 CODE_BAD_REQUEST = 4000
+CODE_INSUFFICIENT_POINTS = 4001  # 积分不足（同步 402）
+CODE_RENDER_QUOTA = 4029         # 每日渲染时长超限（同步 402，start 预检/助手额度）
 CODE_UNAUTHORIZED = 4010
 CODE_FORBIDDEN = 4030
 CODE_NOT_FOUND = 4040
@@ -22,6 +24,7 @@ CODE_SERVER_ERROR = 5000
 HTTP_TO_CODE = {
     400: CODE_BAD_REQUEST,
     401: CODE_UNAUTHORIZED,
+    402: CODE_INSUFFICIENT_POINTS,  # 402 家族默认 4001；4029 需视图显式挂 business_code
     403: CODE_FORBIDDEN,
     404: CODE_NOT_FOUND,
     405: CODE_METHOD_NOT_ALLOWED,
@@ -71,9 +74,10 @@ class CustomJSONRenderer(JSONRenderer):
                 if isinstance(data, dict) and "request_id" in data:
                     payload["data"] = {"request_id": data["request_id"]}
                 return payload
-            # 无 detail：视为字段校验错误，原字典放进 data.errors
+            # 无 detail：视为字段校验错误，原字典放进 data.errors；
+            # 业务码仍按 HTTP/显式 business_code 映射（402→4001/4029、409→4090）
             msg = "参数校验失败"
-            return {"code": CODE_BAD_REQUEST, "msg": msg, "data": {"errors": data}}
+            return {"code": code, "msg": msg, "data": {"errors": data}}
 
         # 分页结果：含四个键时提升
         if isinstance(data, dict) and {"page", "limit", "total", "results"} <= set(data.keys()):

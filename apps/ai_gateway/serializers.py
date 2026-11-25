@@ -1,5 +1,5 @@
 """ai_gateway serializers。"""
-from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from rest_framework import serializers
 
 from .models import AIModel, AIProvider, CostRecord, ProviderVisibility, UserProviderCredential
@@ -31,6 +31,8 @@ class AIModelCreationSerializer(serializers.ModelSerializer):
 class AIProviderSerializer(serializers.ModelSerializer):
     models = AIModelSerializer(many=True, read_only=True)
     has_key = serializers.SerializerMethodField()
+    # 只读费率披露：custom 行每次调用向属主收取的固定服务费（分）；platform 行为 null
+    service_fee_per_call = serializers.SerializerMethodField()
 
     class Meta:
         model = AIProvider
@@ -38,6 +40,7 @@ class AIProviderSerializer(serializers.ModelSerializer):
             "id", "name", "provider_type", "adapter_type", "base_url", "api_key_encrypted",
             "has_key", "visibility", "created_by", "is_active", "priority",
             "rate_limit", "timeout_seconds", "retry_count", "models", "created_at",
+            "service_fee_per_call",
         ]
         read_only_fields = ["created_at", "created_by"]
         extra_kwargs = {
@@ -77,7 +80,7 @@ class AIProviderSerializer(serializers.ModelSerializer):
     def validate_base_url(self, value):
         ok, reason = validate_base_url(value)
         if not ok:
-            raise ValidationError(reason)
+            raise serializers.ValidationError(reason)
         return value
 
     def validate(self, attrs):
@@ -91,13 +94,13 @@ class AIProviderSerializer(serializers.ModelSerializer):
 
         # visibility=custom 行不允许携带平台 Key（Key 走 UserProviderCredential）
         if visibility == ProviderVisibility.CUSTOM and api_key:
-            raise ValidationError({
+            raise serializers.ValidationError({
                 "api_key_encrypted": "custom 行不携带平台 Key；请使用 UserProviderCredential。"
             })
 
         # visibility=platform 行仅管理员可写；普通用户创建/修改 platform 行一律拒绝
         if visibility == ProviderVisibility.PLATFORM and not is_admin:
-            raise ValidationError({
+            raise serializers.ValidationError({
                 "visibility": "platform 行仅平台管理员可创建/修改。"
             })
 
@@ -106,7 +109,7 @@ class AIProviderSerializer(serializers.ModelSerializer):
             from urllib.parse import urlsplit
             parts = urlsplit(str(base_url))
             if parts.scheme != "https":
-                raise ValidationError({
+                raise serializers.ValidationError({
                     "base_url": "custom 行仅允许 https 公网地址（http 与内网均不允许）。"
                 })
 
@@ -122,6 +125,13 @@ class AIProviderSerializer(serializers.ModelSerializer):
 
     def get_has_key(self, obj) -> bool:
         return bool(obj.api_key_encrypted)
+
+    def get_service_fee_per_call(self, obj):
+        """platform 行按用量计价无固定服务费 → null；custom 行暴露部署配置费率。"""
+        if obj.visibility != ProviderVisibility.CUSTOM:
+            return None
+        from django.conf import settings as dj_settings
+        return int(getattr(dj_settings, "SERVICE_FEE_PER_CALL", 0) or 0)
 
 
 class UserProviderCredentialSerializer(serializers.ModelSerializer):
@@ -154,30 +164,84 @@ class UserProviderCredentialSerializer(serializers.ModelSerializer):
     def validate_provider(self, provider):
         # 只能给 visibility=custom 的供应商配凭证（platform 行走平台 Key，无需用户凭证）
         if provider.visibility != ProviderVisibility.CUSTOM:
-            raise ValidationError(
+            raise serializers.ValidationError(
                 "仅 visibility=custom 的供应商支持用户凭证；"
                 "platform 行的 Key 由平台维护。"
             )
+        # 属主绑定：凭证只能配在本人创建的自定义供应商上（管理员不豁免，
+        # 平台 Key 走 AIProvider.api_key_encrypted，无用户凭证概念）
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if user is None or not user.is_authenticated or provider.created_by_id != user.id:
+            raise serializers.ValidationError("只能为自己的自定义供应商配置凭证")
         return provider
+
+    def validate(self, attrs):
+        """重复 (user, provider) 预查：返回 400 字段错误而非落库撞唯一约束 500。"""
+        provider = attrs.get("provider") or getattr(self.instance, "provider", None)
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if provider is not None and user is not None and user.is_authenticated:
+            from .models import UserProviderCredential
+            qs = UserProviderCredential.objects.filter(user=user, provider=provider)
+            if self.instance is not None:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError({"provider": ["该供应商已存在凭证。"]})
+        return attrs
 
     def create(self, validated_data):
         plain = validated_data.pop("api_key", None)
         if not plain:
-            raise ValidationError({"api_key": "创建凭证必须提供 api_key。"})
+            raise serializers.ValidationError({"api_key": ["创建凭证必须提供 api_key。"]})
         request = self.context["request"]
         validated_data["user"] = request.user
         instance = UserProviderCredential(**validated_data)
         instance.set_key(plain)
-        instance.save()
+        try:
+            with transaction.atomic():
+                instance.save()
+        except IntegrityError as exc:
+            # 区分 (user, provider) 唯一冲突与其它完整性错误（如 provider
+            # 已被并发删除的 FK 违约）：只有确认重复行存在才翻译成 400。
+            if UserProviderCredential.objects.filter(
+                user_id=request.user.pk, provider_id=validated_data["provider"].pk,
+            ).exists():
+                raise serializers.ValidationError(
+                    {"provider": ["该供应商已存在凭证。"]}
+                ) from exc
+            raise
         return instance
 
     def update(self, instance, validated_data):
         plain = validated_data.pop("api_key", None)
+        provider = validated_data.get("provider")
+        provider_changed = (
+            provider is not None and provider.pk != instance.provider_id
+        )
+        if provider_changed and not plain:
+            raise serializers.ValidationError(
+                {"api_key": ["更换供应商时必须重新提供 api_key。"]}
+            )
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         if plain:
             instance.set_key(plain)
-        instance.save()
+        if plain or provider_changed:
+            # 换 Key / 换供应商后旧验证结论失效，避免回显「已验证」。
+            instance.last_verified_at = None
+        try:
+            with transaction.atomic():
+                instance.save()
+        except IntegrityError as exc:
+            conflict = UserProviderCredential.objects.filter(
+                user_id=instance.user_id, provider_id=instance.provider_id,
+            ).exclude(pk=instance.pk).exists()
+            if conflict:
+                raise serializers.ValidationError(
+                    {"provider": ["该供应商已存在凭证。"]}
+                ) from exc
+            raise
         return instance
 
 

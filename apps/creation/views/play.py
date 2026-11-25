@@ -1,4 +1,6 @@
 """creation views —— play 树资源。"""
+import logging
+
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
@@ -28,6 +30,8 @@ from ..serializers import (
 from .base import PlayScopedViewSet
 
 _ACTIVE_TASK_STATUSES = ("PENDING", "RUNNING", "RETRYING")
+
+logger = logging.getLogger(__name__)
 
 
 def _member_limits():
@@ -201,6 +205,20 @@ class PlayViewSet(viewsets.ModelViewSet):
         if invitation.role == MemberRole.OWNER:
             return self._accept_transfer(request, invitation)
 
+        # 属主不能被普通邀请降级：属主转让后遗留的 viewer/editor 邀请
+        # 若被接受，update_or_create 会把 OWNER 成员行改写为邀请角色，
+        # 导致 created_by 仍是该用户但 can_manage_play 失败（管理权锁死）。
+        existing = PlayMember.objects.filter(
+            play=invitation.play, user_id=request.user.pk
+        ).first()
+        if invitation.play.created_by_id == request.user.pk or (
+            existing is not None and existing.role == MemberRole.OWNER
+        ):
+            return Response(
+                {"detail": "属主不能被普通邀请降级；请先转让属主"},
+                status=status.HTTP_409_CONFLICT,
+            )
+
         member_limit, _, _ = _member_limits()
         active = PlayMember.objects.filter(
             play=invitation.play, status=MemberStatus.ACTIVE
@@ -214,13 +232,17 @@ class PlayViewSet(viewsets.ModelViewSet):
         with transaction.atomic():
             invitation.status = InvitationStatus.ACCEPTED
             invitation.save(update_fields=["status"])
-            PlayMember.objects.filter(
-                play=invitation.play, user_id=request.user.pk
-            ).update(status=MemberStatus.REMOVED)
-            PlayMember.objects.create(
-                play=invitation.play, user_id=request.user.pk, role=invitation.role,
-                status=MemberStatus.ACTIVE,
-                invited_at=invitation.created_at, accepted_at=timezone.now(),
+            # 单行成员模型：被移除成员重新受邀时就地激活/改角色，
+            # 不能先置 REMOVED 再 create（(play,user) 唯一约束冲突）。
+            # 并发：未对邀请行加锁（既有行为，design D3 登记，后续如需强一致再议）。
+            PlayMember.objects.update_or_create(
+                play=invitation.play, user_id=request.user.pk,
+                defaults={
+                    "role": invitation.role,
+                    "status": MemberStatus.ACTIVE,
+                    "invited_at": invitation.created_at,
+                    "accepted_at": timezone.now(),
+                },
             )
             _audit(request, "member_accept", play=invitation.play,
                    target_type="invitation", target_id=invitation.pk, role=invitation.role)
@@ -255,6 +277,10 @@ class PlayViewSet(viewsets.ModelViewSet):
         # 其余待接受的转让请求一并撤销（避免双重转让）
         PlayInvitation.objects.filter(
             play=play, role=MemberRole.OWNER, status=InvitationStatus.PENDING,
+        ).exclude(pk=invitation.pk).update(status=InvitationStatus.REVOKED)
+        # 新属主名下遗留的普通邀请一并撤销：避免其接受后把 OWNER 成员行降级
+        PlayInvitation.objects.filter(
+            play=play, invitee_id=request.user.pk, status=InvitationStatus.PENDING,
         ).exclude(pk=invitation.pk).update(status=InvitationStatus.REVOKED)
         _audit(request, "ownership_transfer", play=play, target_type="user",
                target_id=request.user.pk, from_user=old_owner_id, to_user=request.user.pk)
@@ -359,6 +385,11 @@ class PlayViewSet(viewsets.ModelViewSet):
         if play.status != PlayStatus.DRAFT:
             return Response({"detail": f"短剧当前状态为 {play.status}，只有草稿可启动"},
                             status=status.HTTP_409_CONFLICT)
+        # 计费同步预检（design D2）：在状态迁移前只读校验，拒绝时 Play 保持 DRAFT、
+        # 不创建 TaskRecord；异步派发闸仍会再校验一次（竞态见 design D2）。
+        gate_resp = self._start_billing_preflight(play)
+        if gate_resp is not None:
+            return gate_resp
         try:
             # transition 只是一次 save；post_save 信号派发大纲任务
             state_machine.transition(play, PlayStatus.OUTLINING)
@@ -366,6 +397,61 @@ class PlayViewSet(viewsets.ModelViewSet):
             # 并发下状态可能已变（守卫与迁移之间），这里兜底返回 409
             return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
         return Response(self.get_serializer(play).data)
+
+    @staticmethod
+    def _start_billing_preflight(play):
+        """start 的计费预检：余额 → 402/4001；每日额度 → 402/4029；槽位 → 409/4090。
+
+        每日额度只检查「已经用完」（OUTLINE 是 ai 任务、零渲染秒，不能按
+        60s 预留，否则额度尚有余量时会被 4029 误拦）。
+        估算失败记 warning 并按 0 预检（与派发闸一致：不阻断创作）。
+        created_by 为空（历史/后台建剧）时跳过，与 dispatcher 计费守卫一致。
+        返回 None = 通过。
+        """
+        from apps.billing.services.gate import (
+            InsufficientPoints, QuotaExceeded, preflight,
+        )
+        from apps.billing.services.wallet import yuan_to_points
+        from ..assistant.cost_estimator import estimate_task_cost
+        from ..models import TaskType
+
+        if play.created_by_id is None:
+            return None
+        estimate = 0
+        try:
+            est = estimate_task_cost(play, TaskType.OUTLINE)
+            estimate = yuan_to_points(est["estimated_cost"])
+        except Exception:  # noqa: BLE001 — 估算失败按 0 预检（不阻断创作）
+            logger.warning(
+                "Play#%s start 预检计价估算失败，以 0 预检", play.pk, exc_info=True
+            )
+        try:
+            preflight(
+                play.created_by, estimate, slot_kind="ai",
+                daily_exhausted_only=True,
+            )
+        except InsufficientPoints as exc:
+            resp = Response({
+                "detail": f"积分余额不足，请充值后重试：{exc}",
+                "reason": "insufficient_points",
+                "needed": exc.needed,
+                "balance": exc.balance,
+            }, status=status.HTTP_402_PAYMENT_REQUIRED)
+            resp.business_code = 4001
+            return resp
+        except QuotaExceeded as exc:
+            if getattr(exc, "kind", "") == "daily_render":
+                resp = Response({
+                    "detail": f"今日渲染时长额度已用完：{exc}",
+                    "reason": "daily_render_exhausted",
+                }, status=status.HTTP_402_PAYMENT_REQUIRED)
+                resp.business_code = 4029  # 每日额度：与 4001 区分
+                return resp
+            return Response({
+                "detail": f"并发任务已达上限，请稍后重试：{exc}",
+                "reason": "quota_exceeded",
+            }, status=status.HTTP_409_CONFLICT)
+        return None
 
     @action(detail=True, methods=["post"])
     def approve(self, request, pk=None):

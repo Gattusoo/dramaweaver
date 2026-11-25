@@ -31,10 +31,23 @@ class WalletAdjustSerializer(serializers.Serializer):
 
     amount = serializers.IntegerField(
         help_text="调整额（分，可正可负，不可为 0）",
+        error_messages={
+            "required": "请填写调整额",
+            "invalid": "调整额必须为整数",
+            "max_string_length": "调整额必须为整数",
+            "null": "请填写调整额",
+        },
     )
     note = serializers.CharField(
         max_length=200, required=True, allow_blank=False,
         help_text="调整原因（必填，写审计）",
+        error_messages={
+            "required": "请填写调整原因",
+            "blank": "请填写调整原因",
+            "invalid": "调整原因必须为字符串",
+            "null": "请填写调整原因",
+            "max_length": "调整原因不能超过 200 字",
+        },
     )
 
     def validate_amount(self, value):

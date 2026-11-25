@@ -85,10 +85,14 @@ HTTP 状态码保持真实语义（200 / 201 / 204 等）；`204` 无响应体�
 | code  | HTTP | 含义 |
 |-------|------|------|
 | 4003  | 403  | 短剧已被平台管理员冻结（生成/发布入口拒绝，附 `reason: "play_frozen"`） |
-| 4001  | 402  | 积分不足（任务派发预扣失败，附 `reason: "insufficient_points"`，`data` 含 `needed`（需扣分）与 `balance`（当前余额，整数分）） |
-| 4029  | 402  | 渲染额度用完（属主当日渲染时长已达上限，附 `reason: "daily_render_exhausted"`） |
+| 4001  | 402  | 积分不足（同步计费门禁：助手发送 / Play start 预检；附 `reason: "insufficient_points"`，`needed`（需扣分）与 `balance`（当前余额，整数分）位于**信封顶层**，`data=null`） |
+| 4029  | 402  | 渲染额度用完（**仅同步** Play start 预检：属主当日渲染时长已达上限；附 `reason: "daily_render_exhausted"`） |
 
 > 同一含义不得复用不同的码；后续新增业务错误码须在此表登记。
+
+**同步 402 vs 异步 FAILED**：助手发送与 Play start 预检有同步响应，用 402 家族（4001/4029）；生成/重做/预览/发布等异步派发路径请求已返回 `202 + task_record_id`，计费拒绝以 **FAILED TaskRecord** 表达，`error_message` 前缀为「钱包余额不足：」「每日渲染时长超限：」「并发槽位已满：」，不得伪造 402。
+
+**Play start 预检**：`POST /api/plays/{id}/start/` 在状态迁移前只读校验余额/并发槽位/每日额度——余额不足 → 402 `4001`（`needed/balance`）、每日额度**已用完**（`used >= limit`；OUTLINE 为零渲染秒的 ai 任务，不按未来 60s 预留）→ 402 `4029`、槽位满 → 409 `4090`（`reason="quota_exceeded"`）；拒绝时 Play 保持 DRAFT、不创建 TaskRecord。`created_by` 为空的剧跳过计费预检（与异步派发一致）。预检通过后与实际派发之间存在竞态窗口（并发消耗余额/槽位），此时仍可能留下 FAILED TaskRecord + OUTLINING（design D2 已登记）。
 
 #### 计费端点（billing）
 
@@ -205,11 +209,11 @@ HTTP 状态码保持真实语义（200 / 201 / 204 等）；`204` 无响应体�
 
 | 端点 | 说明 |
 |---|---|
-| `POST /api/plays/{id}/invite/` | 属主邀请成员。`{ "user_ids": [2], "role": "editor" }` → `201 { detail, invitations[] }`；角色仅 `editor/viewer`；超成员/每日邀请上限 `429`；待对方接受才生效 |
+| `POST /api/plays/{id}/invite/` | 属主邀请成员。`{ "user_ids": [2], "role": "editor" }` → `201 { detail, invitations[] }`；角色仅 `editor/viewer`；超成员/每日邀请上限 `429`；待对方接受才生效；被移除成员可重新受邀（成员行就地激活，不新增行） |
 | `GET /api/plays/{id}/members/` | active 成员列表（成员可看） |
 | `POST /api/plays/{id}/members/remove/` | 属主移除成员。`{ "user_ids": [2] }` → `200`；属主不可移除（`400`，走转让）；被移除者会话转只读、待处理提案作废 |
 | `GET /api/plays/invitations/` | 我的待接受邀请（含 `expired` 标记） |
-| `POST /api/plays/invitations/accept/` | 接受邀请。`{ "invitation_id": 1 }` → `200`；过期/已处理 `409`，非本人邀请 `404` |
+| `POST /api/plays/invitations/accept/` | 接受邀请。`{ "invitation_id": 1 }` → `200`；过期/已处理 `409`，非本人邀请 `404`；被移除成员再次接受时复用原成员行（status=active、role/accepted_at 刷新） |
 | `POST /api/plays/{id}/transfer-ownership/` | 属主发起转让。`{ "to_user": 2 }` → `200 { invitation_id }`；仅 active editor 可接；对方通过 accept 接受后才生效（审计记录双方） |
 | `POST /api/admin/plays/{id}/review/` | 平台管理员只读审核快照（每次调用写 AuditLog） |
 | `POST /api/admin/plays/{id}/freeze/`、`/api/admin/plays/{id}/unfreeze/` | 平台管理员冻结/解冻。`{ "reason": "..." }`（必填）；冻结后生成/发布入口返回 `403` 业务码 `4003` |
@@ -367,8 +371,29 @@ HTTP 状态码保持真实语义（200 / 201 / 204 等）；`204` 无响应体�
 
 ## 5. AI 配置 `/api/`
 
-### 供应商 `/api/ai-providers/`（仅 admin）
-字段：`id, name, provider_type, adapter_type, base_url, api_key_encrypted, is_active, priority, rate_limit, timeout_seconds, retry_count, models[], created_at`
+### 供应商 `/api/ai-providers/`（按 `visibility` 分流）
+字段：`id, name, provider_type, adapter_type, base_url, api_key_encrypted, visibility, created_by, is_active, priority, rate_limit, timeout_seconds, retry_count, models[], created_at`
+
+- **platform 行**：仅平台管理员可创建/修改/删除；普通用户可读取目录。普通用户 POST platform → `400`，`data.errors.visibility`；普通用户 PATCH/DELETE platform → `403`（对象级权限先于请求体校验，不包装成 400）。
+- **custom 行**：已认证用户可创建（`created_by` 自动为请求者），强制公网 HTTPS，不得携带 `api_key_encrypted`（Key 走用户凭证）；属主本人可读写，其他普通用户不可见，PATCH/DELETE 他人 custom → `404`。
+- `service_fee_per_call`（只读）：custom 行回显部署配置 `SERVICE_FEE_PER_CALL`（整数分/次，默认 0，每次成功调用向属主收取的固定服务费）；platform 行为 `null`（按用量计价）。
+
+### 用户凭证 `/api/user-credentials/`（属主私有）
+字段：`id, user, provider, provider_name, label, api_key, key_last4, is_active, last_verified_at, created_at, updated_at`
+- 写侧提交明文 `api_key`；读侧只回 `key_last4`，任何角色不回显明文。
+- 凭证只能绑定**本人创建的 `visibility=custom` 供应商**：绑定 platform 或他人 custom → `400`，`data.errors.provider`；平台管理员不豁免。
+- 同一 `(user, provider)` 重复创建 → `400`，`data.errors.provider=["该供应商已存在凭证。"]`，不落库、不为 500。
+- PATCH 更换 `provider` 必须同时提交新的 `api_key`（否则 `400`，`data.errors.api_key`）；更换 provider 或 api_key 会清空 `last_verified_at`，需重新 verify。运行期凭证解析同时校验供应商属主，历史越权绑定行不再生效。
+- list 只含本人行；detail/PATCH/DELETE/verify 他人凭证 → `404`（避免存在性泄露）。列表按 `-created_at, -id` 稳定分页。
+- `POST /api/user-credentials/{id}/verify/`：最小请求探测供应商，回写 `last_verified_at`；失败返回脱敏分类文案。
+
+```json
+// 400 示例：凭证重复
+{ "code": 4000, "msg": "参数校验失败", "data": { "errors": { "provider": ["该供应商已存在凭证。"] } } }
+
+// 400 示例：绑定他人 custom 供应商
+{ "code": 4000, "msg": "参数校验失败", "data": { "errors": { "provider": ["只能为自己的自定义供应商配置凭证"] } } }
+```
 
 ### 模型 `/api/ai-models/`（仅 admin）
 字段：`id, provider, model_name, display_name, model_type, capabilities, cost_config, is_active, created_at`
@@ -376,14 +401,22 @@ HTTP 状态码保持真实语义（200 / 201 / 204 等）；`204` 无响应体�
 ### 配方 `/api/agent-configs/`（认证用户；平台管理员可见全量，普通用户仅自己 + 模板）
 字段：`id, name, description, llm_model, tts_model, image_model, video_model, llm_model_id, tts_model_id, image_model_id, video_model_id, llm_failover, tts_failover, image_failover, video_failover, retry_count, retry_backoff, fallback_on_limit, default_audit_mode, default_redo_granularity, consistency_mode, prompt_templates, style_params, is_template, created_by, created_at`
 - `*_model_id`：写侧外键；`*_failover`：降级链 JSON（模型 id 列表）。
+- **模型可用性校验（创建/更新）**：所有模型引用（主模型五字段 + 五条降级链）必须通过 `is_model_usable_for_user`——platform 模型人人可用；custom 模型须为本人供应商且有启用凭证；不可用 → `400`，字段级错误使用拒绝原因（含模型/供应商名）。历史配方若含不可用引用，更新时可能被拒，需先调整为可用模型。
 - 创作助手：`assistant_model`（读）/ `assistant_model_id`（写）、`assistant_failover`、`assistant_budget` `{max_cost, max_iterations, max_tool_calls}`（默认不限费用 / 8 次迭代 / 20 次工具调用）。为空时回退 `llm_model` / `llm_failover`。所选模型须在 `capabilities` 中设置 `supports_tools: true`，否则 `400`。
-- **多级助手模型（Phase 3.3 成本优化）**：`assistant_models` `{small, medium, large}`（AIModel pk）。
+- **多级助手模型（Phase 3.3 成本优化）**：`assistant_models` `{small, medium, large}`（AIModel pk 或 `null`）。
   助手轮按本轮任务复杂度选档：<0.4 → small、0.4-0.7 → medium、>0.7 → large；
   档位未配置回退 `assistant_model`（行为与单档一致）。摘要类辅助调用
   （上下文压缩/分支摘要）优先用 small 档（`assistant_compaction.summary_model` pk 配置优先级更高）。
+  校验：仅接受 `small|medium|large` 键（未知键 `400`，不静默剔除）；每档须为启用的 LLM；medium/large 须支持工具调用（`supports_tools=true`），small 档允许无工具模型（上下文压缩/分支摘要以 `supports_tool_calls=False` 消费）；custom 供应商模型须满足模型可用性规则（同上方配方校验）。PATCH 按档合并：`null` 删除该档、未提交档位保持不变；显式 `{}` 清空全部档位（回退单档）；PUT 整体替换。
+
+```json
+// 400 示例：配方引用他人 custom 模型
+{ "code": 4000, "msg": "参数校验失败", "data": { "errors": { "llm_model_id": ["模型 My Model 属于其他用户的私有供应商"] } } }
+```
 
 #### POST /api/agent-configs/{id}/clone/
 克隆配方为私有副本（`is_template=False`，归属当前用户）→ `201` 新 AgentConfig
+- 克隆前校验源配方全部模型引用（含降级链与助手字段）对当前用户可用；缺失/非法 id、非列表降级链、不支持工具调用的助手模型同样 `400`（`msg` 指明「源配方包含当前用户不可用的模型：…」），不创建副本。
 
 ---
 

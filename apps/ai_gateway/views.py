@@ -67,9 +67,17 @@ class AIProviderViewSet(viewsets.ModelViewSet):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied("仅可管理自己创建的 custom 供应商；platform 行由平台管理员维护。")
 
-    def perform_update(self, serializer):
-        self._check_row_permission(self.get_object())
+    def update(self, request, *args, **kwargs):
+        # 对象级权限先于请求体校验：普通用户改 platform 行返回 403 而非 400。
+        # 单次取对象：partial_update 继承实现会回调本方法，权限判定与保存
+        # 使用同一实例快照（避免重复 SELECT 与 TOCTOU）。
+        instance = self.get_object()
+        self._check_row_permission(instance)
+        partial = kwargs.pop("partial", False)
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
         serializer.save()
+        return Response(serializer.data)
 
     def perform_destroy(self, instance):
         self._check_row_permission(instance)
@@ -95,7 +103,12 @@ class UserProviderCredentialViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         from .models import UserProviderCredential
-        return UserProviderCredential.objects.filter(user=self.request.user).select_related("provider")
+        return (
+            UserProviderCredential.objects
+            .filter(user=self.request.user)
+            .select_related("provider")
+            .order_by("-created_at", "-id")  # 稳定分页：避免 UnorderedObjectListWarning 与页间漂移
+        )
 
     def perform_create(self, serializer):
         serializer.save()  # user 在 serializer.create 内自 request.user 取
